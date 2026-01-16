@@ -79,6 +79,10 @@ function doPost(e) {
       return createJsonResponse(handleCreateData(data));
     }
 
+    if (action === 'delete') {
+      return createJsonResponse(handleDeleteData(data));
+    }
+
     // Fallback detection
     if (data.file) {
       return createJsonResponse(handleUploadData(data));
@@ -207,6 +211,41 @@ function handleUploadData(data) {
 
   } catch (error) {
     return { error: 'Upload failed: ' + error.message };
+  }
+}
+
+function handleDeleteData(data) {
+  try {
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
+    const allData = sheet.getDataRange().getValues();
+
+    if (allData.length <= 1) {
+      return { error: 'No data to delete' };
+    }
+
+    const headers = allData[0];
+    const idIndex = headers.indexOf('id');
+
+    if (idIndex === -1) {
+      return { error: 'ID column not found' };
+    }
+
+    // Find row to delete
+    for (let i = 1; i < allData.length; i++) {
+      if (allData[i][idIndex] === data.id) {
+        // Delete the row (i+1 because sheet rows are 1-indexed)
+        sheet.deleteRow(i + 1);
+        return {
+          success: true,
+          message: 'Image deleted successfully'
+        };
+      }
+    }
+
+    return { error: 'Image not found' };
+
+  } catch (error) {
+    return { error: 'Delete failed: ' + error.message };
   }
 }
 

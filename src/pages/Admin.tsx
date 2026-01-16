@@ -21,41 +21,41 @@ interface Operator {
 function Admin() {
   const [userRole, setUserRole] = useState<UserRole>(null)
   const [currentUser, setCurrentUser] = useState<string>('')
-  
+
   // Login state
   const [loginType, setLoginType] = useState<'admin' | 'operator'>('admin')
   const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [authError, setAuthError] = useState('')
-  
+
   // Tab state
   const [activeTab, setActiveTab] = useState<TabType>('list')
-  
+
   // Form state
   const [title, setTitle] = useState('')
   const [slug, setSlug] = useState('')
   const [downloadUrl, setDownloadUrl] = useState('')
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
-  
+
   // UI state
   const [loading, setLoading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
-  
+
   // Image list state
   const [images, setImages] = useState<ImageItem[]>([])
   const [listLoading, setListLoading] = useState(false)
   const [listError, setListError] = useState<string | null>(null)
-  
+
   // Edit modal state
   const [editingImage, setEditingImage] = useState<ImageItem | null>(null)
   const [editTitle, setEditTitle] = useState('')
   const [editSlug, setEditSlug] = useState('')
   const [editDownloadUrl, setEditDownloadUrl] = useState('')
-  
+
   // Operator management state
   const [operators, setOperators] = useState<Operator[]>([])
   const [newOperatorUsername, setNewOperatorUsername] = useState('')
@@ -84,7 +84,7 @@ function Admin() {
   // Check existing auth on mount
   useEffect(() => {
     loadOperators()
-    
+
     const token = localStorage.getItem(ADMIN_TOKEN_KEY)
     if (token) {
       // Check if admin
@@ -93,7 +93,7 @@ function Admin() {
         setCurrentUser(ADMIN_EMAIL)
         return
       }
-      
+
       // Check if operator
       if (token.startsWith('operator:')) {
         const opUsername = token.replace('operator:', '')
@@ -127,22 +127,22 @@ function Admin() {
   const loadImages = async () => {
     setListLoading(true)
     setListError(null)
-    
+
     const result = await fetchImageList()
-    
+
     if (result.error) {
       setListError(result.error)
     } else if (result.data) {
       setImages(result.data)
     }
-    
+
     setListLoading(false)
   }
 
   const handleLogin = useCallback((e: React.FormEvent) => {
     e.preventDefault()
     setAuthError('')
-    
+
     if (loginType === 'admin') {
       // Admin login
       if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
@@ -207,7 +207,7 @@ function Admin() {
 
       setUploadProgress('Uploading image to Google Drive...')
       const uploadResult = await uploadImage(imageFile)
-      
+
       if (uploadResult.error || !uploadResult.data) {
         throw new Error(uploadResult.error || 'Failed to upload image')
       }
@@ -231,7 +231,7 @@ function Admin() {
       setImageFile(null)
       setImagePreview(null)
       setSuccess('Image uploaded successfully!')
-      
+
       clearCache()
       loadImages()
       setActiveTab('list')
@@ -306,6 +306,35 @@ function Admin() {
     alert('Copied to clipboard!')
   }
 
+  const handleDeleteImage = async (image: ImageItem) => {
+    if (!confirm(`Are you sure you want to delete "${image.title}"?\n\nThis will remove the entry from the database but will NOT delete the file from Google Drive.`)) {
+      return;
+    }
+
+    setListLoading(true);
+    setListError(null);
+
+    try {
+      const { deleteImageEntry } = await import('../lib/api');
+      const result = await deleteImageEntry(image.id);
+
+      if (result.error) {
+        setListError(result.error);
+        alert('Failed to delete image: ' + result.error);
+      } else {
+        alert('Image deleted successfully!');
+        // Reload images
+        loadImages();
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to delete image';
+      setListError(message);
+      alert('Error: ' + message);
+    } finally {
+      setListLoading(false);
+    }
+  }
+
   // Login Screen
   if (!userRole) {
     return (
@@ -319,17 +348,17 @@ function Admin() {
           <div className="max-w-md mx-auto">
             <div className="card p-8">
               <div className="text-center mb-6">
-                <svg 
-                  className="w-16 h-16 text-primary-600 mx-auto mb-4" 
-                  fill="none" 
-                  stroke="currentColor" 
+                <svg
+                  className="w-16 h-16 text-primary-600 mx-auto mb-4"
+                  fill="none"
+                  stroke="currentColor"
                   viewBox="0 0 24 24"
                 >
-                  <path 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round" 
-                    strokeWidth={2} 
-                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" 
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
                   />
                 </svg>
                 <h1 className="text-2xl font-bold text-gray-900">Login</h1>
@@ -340,22 +369,20 @@ function Admin() {
                 <button
                   type="button"
                   onClick={() => setLoginType('admin')}
-                  className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
-                    loginType === 'admin'
-                      ? 'bg-white text-primary-600 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
+                  className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${loginType === 'admin'
+                    ? 'bg-white text-primary-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                    }`}
                 >
                   Admin
                 </button>
                 <button
                   type="button"
                   onClick={() => setLoginType('operator')}
-                  className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
-                    loginType === 'operator'
-                      ? 'bg-white text-primary-600 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
+                  className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${loginType === 'operator'
+                    ? 'bg-white text-primary-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                    }`}
                 >
                   Operator
                 </button>
@@ -438,14 +465,13 @@ function Admin() {
               </h1>
               <p className="text-sm text-gray-500">
                 Logged in as: <span className="font-medium">{currentUser}</span>
-                <span className={`ml-2 px-2 py-0.5 rounded text-xs ${
-                  userRole === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
-                }`}>
+                <span className={`ml-2 px-2 py-0.5 rounded text-xs ${userRole === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+                  }`}>
                   {userRole}
                 </span>
               </p>
             </div>
-            <button 
+            <button
               onClick={handleLogout}
               className="btn-secondary text-sm"
             >
@@ -457,11 +483,10 @@ function Admin() {
           <div className="flex border-b border-gray-200 mb-6 overflow-x-auto">
             <button
               onClick={() => setActiveTab('list')}
-              className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                activeTab === 'list'
-                  ? 'border-primary-600 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
+              className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'list'
+                ? 'border-primary-600 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
             >
               <svg className="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
@@ -470,11 +495,10 @@ function Admin() {
             </button>
             <button
               onClick={() => setActiveTab('upload')}
-              className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                activeTab === 'upload'
-                  ? 'border-primary-600 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
+              className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'upload'
+                ? 'border-primary-600 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
             >
               <svg className="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -484,11 +508,10 @@ function Admin() {
             {userRole === 'admin' && (
               <button
                 onClick={() => setActiveTab('operators')}
-                className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                  activeTab === 'operators'
-                    ? 'border-primary-600 text-primary-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
+                className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'operators'
+                  ? 'border-primary-600 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}
               >
                 <svg className="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -596,15 +619,26 @@ function Admin() {
                             Download
                           </a>
                           {userRole === 'admin' && (
-                            <button
-                              onClick={() => openEditModal(image)}
-                              className="btn-secondary text-sm py-2 px-3 flex-1 sm:flex-none"
-                            >
-                              <svg className="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                              </svg>
-                              Edit
-                            </button>
+                            <>
+                              <button
+                                onClick={() => openEditModal(image)}
+                                className="btn-secondary text-sm py-2 px-3 flex-1 sm:flex-none"
+                              >
+                                <svg className="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteImage(image)}
+                                className="btn-secondary text-sm py-2 px-3 flex-1 sm:flex-none bg-red-50 hover:bg-red-100 text-red-600 border-red-200"
+                              >
+                                <svg className="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                Delete
+                              </button>
+                            </>
                           )}
                           <a
                             href={`/#/p/${image.slug}`}
@@ -777,7 +811,7 @@ function Admin() {
 
                 <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <p className="text-sm text-blue-800">
-                    <strong>Note:</strong> Operators can only upload images and view the list. 
+                    <strong>Note:</strong> Operators can only upload images and view the list.
                     They cannot edit or delete images.
                   </p>
                 </div>
@@ -788,7 +822,7 @@ function Admin() {
                 <h2 className="text-xl font-semibold text-gray-900 mb-6">
                   Registered Operators ({operators.length})
                 </h2>
-                
+
                 {operators.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
                     <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">

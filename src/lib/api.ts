@@ -257,6 +257,41 @@ export async function createImageEntry(item: Omit<ImageItem, 'id' | 'createdAt'>
   }
 }
 
+/**
+ * Delete image entry menggunakan Supabase Edge Function proxy
+ */
+export async function deleteImageEntry(id: string): Promise<ApiResponse<{ success: boolean }>> {
+  try {
+    const response = await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'delete',
+        data: { id }
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Delete failed with status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data.error) {
+      throw new Error(data.error);
+    }
+
+    clearCache();
+
+    return { data: { success: true }, error: null };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to delete entry';
+    return { data: null, error: message };
+  }
+}
+
 export function generateSlug(title: string): string {
   return title
     .toLowerCase()
