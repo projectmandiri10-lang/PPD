@@ -94,16 +94,71 @@ function Post() {
     <>
       <Helmet>
         <title>{item.title} - {siteName}</title>
-        <meta name="description" content={`Download ${item.title} - High quality image from ${siteName}`} />
+        <meta name="description" content={`Download ${item.title} - High quality image from ${siteName}. Free HD download.`} />
+        <meta name="keywords" content={`${item.title}, download, free image, HD, wallpaper, ${siteName}`} />
+        
+        {/* Open Graph */}
         <meta property="og:title" content={`${item.title} - ${siteName}`} />
-        <meta property="og:description" content={`Download ${item.title} - High quality image`} />
+        <meta property="og:description" content={`Download ${item.title} - High quality image. Free HD download.`} />
         <meta property="og:image" content={getImageUrl(item, 'large')} />
+        <meta property="og:image:alt" content={item.title} />
         <meta property="og:type" content="article" />
+        <meta property="og:site_name" content={siteName} />
         {siteUrl && <meta property="og:url" content={pageUrl} />}
+        
+        {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={`${item.title} - ${siteName}`} />
+        <meta name="twitter:description" content={`Download ${item.title} - High quality image`} />
         <meta name="twitter:image" content={getImageUrl(item, 'large')} />
+        <meta name="twitter:image:alt" content={item.title} />
+        
+        {/* SEO */}
         <link rel="canonical" href={pageUrl} />
+        <meta name="robots" content="index, follow, max-image-preview:large" />
+        
+        {/* Structured Data - ImageObject */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "ImageObject",
+            "name": item.title,
+            "description": `Download ${item.title} - High quality image from ${siteName}`,
+            "contentUrl": getImageUrl(item, 'large'),
+            "thumbnailUrl": getImageUrl(item, 'medium'),
+            "uploadDate": item.createdAt,
+            "author": {
+              "@type": "Organization",
+              "name": siteName
+            },
+            "copyrightHolder": {
+              "@type": "Organization", 
+              "name": siteName
+            }
+          })}
+        </script>
+        
+        {/* Breadcrumb Structured Data */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "Home",
+                "item": siteUrl || window.location.origin
+              },
+              {
+                "@type": "ListItem",
+                "position": 2,
+                "name": item.title,
+                "item": pageUrl
+              }
+            ]
+          })}
+        </script>
       </Helmet>
 
       <div className="container-main py-8">

@@ -1,15 +1,41 @@
 # robots.txt for Image Download Hub
-# Ganti https://yourdomain.com dengan domain asli Anda
+# https://yourdomain.com
 
+# Allow all crawlers
 User-agent: *
 Allow: /
+Allow: /#/p/*
 
-# Halaman yang tidak perlu di-index
+# Disallow admin and download gate pages
 Disallow: /#/admin
 Disallow: /#/d/*
 
-# Sitemap location
+# Google specific
+User-agent: Googlebot
+Allow: /
+Allow: /#/p/*
+Disallow: /#/admin
+Disallow: /#/d/*
+
+# Bing specific
+User-agent: Bingbot
+Allow: /
+Allow: /#/p/*
+Disallow: /#/admin
+Disallow: /#/d/*
+
+# Block bad bots
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /
+
+User-agent: MJ12bot
+Disallow: /
+
+# Sitemap
 Sitemap: https://yourdomain.com/sitemap.xml
 
-# Crawl-delay (opsional, untuk mencegah overload)
+# Crawl-delay for politeness
 Crawl-delay: 1

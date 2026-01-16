@@ -1,34 +1,50 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  
   <!-- 
-    CATATAN: Ini adalah sitemap statis dasar.
-    Untuk sitemap dinamis, Anda perlu generate sitemap.xml dari data
-    menggunakan script build atau server-side generation.
-    
-    Ganti https://yourdomain.com dengan domain asli Anda.
+    INSTRUKSI SETUP SITEMAP:
+    1. Ganti https://yourdomain.com dengan domain asli Anda
+    2. Untuk halaman post dinamis, generate sitemap dari data API
+    3. Submit sitemap ke Google Search Console
   -->
   
   <!-- Homepage -->
   <url>
     <loc>https://yourdomain.com/</loc>
+    <lastmod>2025-01-16</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   
   <!-- 
-    Untuk halaman post dinamis (/#/p/slug), tambahkan secara manual
-    atau generate otomatis dari data:
+    CONTOH: Halaman post gambar
+    Tambahkan URL untuk setiap gambar yang di-upload
+    Format: https://yourdomain.com/#/p/slug-gambar
     
     <url>
-      <loc>https://yourdomain.com/#/p/nama-gambar-1</loc>
-      <changefreq>weekly</changefreq>
+      <loc>https://yourdomain.com/#/p/beautiful-sunset</loc>
+      <lastmod>2025-01-15</lastmod>
+      <changefreq>monthly</changefreq>
       <priority>0.8</priority>
+      <image:image>
+        <image:loc>https://drive.google.com/thumbnail?id=FILE_ID&amp;sz=s1000</image:loc>
+        <image:title>Beautiful Sunset</image:title>
+        <image:caption>Download beautiful sunset image for free</image:caption>
+      </image:image>
     </url>
     
     <url>
-      <loc>https://yourdomain.com/#/p/nama-gambar-2</loc>
-      <changefreq>weekly</changefreq>
+      <loc>https://yourdomain.com/#/p/mountain-landscape</loc>
+      <lastmod>2025-01-14</lastmod>
+      <changefreq>monthly</changefreq>
       <priority>0.8</priority>
+      <image:image>
+        <image:loc>https://drive.google.com/thumbnail?id=FILE_ID&amp;sz=s1000</image:loc>
+        <image:title>Mountain Landscape</image:title>
+        <image:caption>Download mountain landscape image for free</image:caption>
+      </image:image>
     </url>
   -->
+  
 </urlset>
