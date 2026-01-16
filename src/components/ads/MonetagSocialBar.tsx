@@ -1,24 +1,24 @@
 import { useEffect, useRef } from 'react'
-import { ADSTERRA_SOCIALBAR_KEY } from '../../config/ads'
+import { MONETAG_TAG_ID, MONETAG_SRC } from '../../config/ads'
 
 /**
- * Adsterra Social Bar Ad Component
+ * Monetag Social Bar Ad Component
  * 
  * Social Bar adalah format iklan yang biasanya muncul sebagai floating bar
  * di bagian bawah layar. Iklan ini tidak mengganggu konten utama.
  * 
  * Untuk mengganti key:
  * 1. Buka file src/config/ads.ts
- * 2. Ganti nilai ADSTERRA_SOCIALBAR_KEY dengan key dari Adsterra dashboard
+ * 2. Ganti nilai MONETAG_TAG_ID dengan Tag ID dari Monetag dashboard
  */
-function AdsterraSocialBar() {
+function MonetagSocialBar() {
   const containerRef = useRef<HTMLDivElement>(null)
   const scriptLoaded = useRef(false)
 
   useEffect(() => {
     // Cek apakah key sudah dikonfigurasi
-    if (ADSTERRA_SOCIALBAR_KEY === 'YOUR_SOCIALBAR_KEY_HERE') {
-      console.warn('Adsterra Social Bar: Key belum dikonfigurasi. Ganti di src/config/ads.ts')
+    if (MONETAG_TAG_ID === 'YOUR_MONETAG_TAG_ID') {
+      console.warn('Monetag Social Bar: Tag ID belum dikonfigurasi. Ganti di src/config/ads.ts')
       return
     }
 
@@ -26,7 +26,7 @@ function AdsterraSocialBar() {
     if (scriptLoaded.current) return
     
     // Cek apakah script sudah ada
-    const existingScript = document.querySelector(`script[src*="${ADSTERRA_SOCIALBAR_KEY}"]`)
+    const existingScript = document.querySelector(`script[src*="${MONETAG_TAG_ID}"]`)
     if (existingScript) {
       scriptLoaded.current = true
       return
@@ -37,17 +37,17 @@ function AdsterraSocialBar() {
       const script = document.createElement('script')
       script.type = 'text/javascript'
       script.async = true
-      script.src = `//www.topcreativeformat.com/${ADSTERRA_SOCIALBAR_KEY}/invoke.js`
+      script.src = MONETAG_SRC
       
       // Error handling
       script.onerror = () => {
-        console.error('Adsterra Social Bar: Failed to load script')
+        console.error('Monetag Social Bar: Failed to load script')
       }
       
       document.body.appendChild(script)
       scriptLoaded.current = true
     } catch (error) {
-      console.error('Adsterra Social Bar: Error injecting script', error)
+      console.error('Monetag Social Bar: Error injecting script', error)
     }
 
     // Cleanup tidak diperlukan untuk Social Bar karena biasanya persistent
@@ -55,7 +55,7 @@ function AdsterraSocialBar() {
 
   // Social Bar tidak memerlukan container visible karena menggunakan posisi fixed
   // Tapi kita tetap render div kosong untuk reference
-  return <div ref={containerRef} id="adsterra-social-bar" style={{ display: 'none' }} />
+  return <div ref={containerRef} id="monetag-social-bar" style={{ display: 'none' }} />
 }
 
-export default AdsterraSocialBar
+export default MonetagSocialBar

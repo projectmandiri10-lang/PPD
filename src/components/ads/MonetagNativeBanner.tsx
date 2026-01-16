@@ -1,24 +1,24 @@
 import { useEffect, useRef } from 'react'
-import { ADSTERRA_NATIVE_KEY } from '../../config/ads'
+import { MONETAG_TAG_ID, MONETAG_SRC } from '../../config/ads'
 
 /**
- * Adsterra Native Banner Ad Component
+ * Monetag Native Banner Ad Component
  * 
  * Native Banner adalah format iklan yang menyatu dengan konten halaman.
  * Iklan ini ditampilkan inline di dalam container yang disediakan.
  * 
  * Untuk mengganti key:
  * 1. Buka file src/config/ads.ts
- * 2. Ganti nilai ADSTERRA_NATIVE_KEY dengan key dari Adsterra dashboard
+ * 2. Ganti nilai MONETAG_TAG_ID dengan Tag ID dari Monetag dashboard
  */
-function AdsterraNativeBanner() {
+function MonetagNativeBanner() {
   const containerRef = useRef<HTMLDivElement>(null)
   const scriptLoaded = useRef(false)
 
   useEffect(() => {
     // Cek apakah key sudah dikonfigurasi
-    if (ADSTERRA_NATIVE_KEY === 'YOUR_NATIVE_KEY_HERE') {
-      console.warn('Adsterra Native Banner: Key belum dikonfigurasi. Ganti di src/config/ads.ts')
+    if (MONETAG_TAG_ID === 'YOUR_MONETAG_TAG_ID') {
+      console.warn('Monetag Native Banner: Tag ID belum dikonfigurasi. Ganti di src/config/ads.ts')
       return
     }
 
@@ -36,24 +36,24 @@ function AdsterraNativeBanner() {
     try {
       // Buat container untuk iklan dengan ID unik
       const adContainer = document.createElement('div')
-      adContainer.id = `container-${ADSTERRA_NATIVE_KEY}`
+      adContainer.id = `container-${MONETAG_TAG_ID}`
       containerRef.current.appendChild(adContainer)
 
       // Buat dan inject script
       const script = document.createElement('script')
       script.type = 'text/javascript'
       script.async = true
-      script.src = `//www.profitabledisplaynetwork.com/${ADSTERRA_NATIVE_KEY}/invoke.js`
+      script.src = MONETAG_SRC
       
       // Error handling
       script.onerror = () => {
-        console.error('Adsterra Native Banner: Failed to load script')
+        console.error('Monetag Native Banner: Failed to load script')
       }
       
       containerRef.current.appendChild(script)
       scriptLoaded.current = true
     } catch (error) {
-      console.error('Adsterra Native Banner: Error injecting script', error)
+      console.error('Monetag Native Banner: Error injecting script', error)
     }
 
     // Cleanup saat unmount
@@ -66,11 +66,11 @@ function AdsterraNativeBanner() {
   }, [])
 
   // Jika key belum dikonfigurasi, tampilkan placeholder
-  if (ADSTERRA_NATIVE_KEY === 'YOUR_NATIVE_KEY_HERE') {
+  if (MONETAG_TAG_ID === 'YOUR_MONETAG_TAG_ID') {
     return (
       <div className="ad-container">
         <p className="text-sm text-gray-400">
-          [Ad Placeholder - Configure ADSTERRA_NATIVE_KEY]
+          [Ad Placeholder - Configure MONETAG_TAG_ID]
         </p>
       </div>
     )
@@ -85,4 +85,4 @@ function AdsterraNativeBanner() {
   )
 }
 
-export default AdsterraNativeBanner
+export default MonetagNativeBanner

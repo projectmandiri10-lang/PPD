@@ -1,34 +1,24 @@
 /**
- * Adsterra Configuration
+ * Monetag Configuration
  * 
- * Cara mengganti key Adsterra:
- * 1. Login ke akun Adsterra (https://adsterra.com)
- * 2. Buat unit iklan baru (Social Bar atau Native Banner)
- * 3. Copy script key dari dashboard Adsterra
- * 4. Ganti nilai di bawah ini dengan key Anda
+ * Cara mengganti key Monetag:
+ * 1. Login ke akun Monetag (https://monetag.com)
+ * 2. Tambahkan website Anda
+ * 3. Dapatkan Tag ID dari dashboard Monetag
+ * 4. Ganti nilai di bawah ini dengan Tag ID Anda
  * 
- * Format Social Bar key: biasanya berupa string seperti "abc123..."
- * Format Native key: biasanya berupa string seperti "xyz789..."
+ * Format Monetag Tag ID: biasanya berupa string seperti "abc123..."
  * 
- * PENTING: Key di bawah adalah placeholder, harus diganti dengan key asli dari Adsterra!
+ * PENTING: Key di bawah adalah placeholder, harus diganti dengan key asli dari Monetag!
  */
 
-// Social Bar Ad Key - Ganti dengan key dari Adsterra dashboard
-export const ADSTERRA_SOCIALBAR_KEY = 'YOUR_SOCIALBAR_KEY_HERE';
+// Monetag Tag ID - Ganti dengan Tag ID dari Monetag dashboard
+export const MONETAG_TAG_ID = import.meta.env.VITE_MONETAG_TAG_ID || 'YOUR_MONETAG_TAG_ID';
 
-// Native Banner Ad Key - Ganti dengan key dari Adsterra dashboard  
-export const ADSTERRA_NATIVE_KEY = 'YOUR_NATIVE_KEY_HERE';
+// Monetag script source URL
+export const MONETAG_SRC = `//cdn.monetag.com/tags/${MONETAG_TAG_ID}.js`;
 
-// Adsterra script source URLs
-export const ADSTERRA_SOCIALBAR_SRC = `//www.topcreativeformat.com/${ADSTERRA_SOCIALBAR_KEY}/invoke.js`;
-export const ADSTERRA_NATIVE_SRC = `//www.profitabledisplaynetwork.com/${ADSTERRA_NATIVE_KEY}/invoke.js`;
-
-// Alternative script patterns (beberapa kampanye Adsterra menggunakan format berbeda)
-// Sesuaikan dengan script yang diberikan Adsterra saat membuat unit iklan
-export const getAdsterraSocialBarScript = (key: string) => {
-  return `//www.topcreativeformat.com/${key}/invoke.js`;
-};
-
-export const getAdsterraNativeScript = (key: string) => {
-  return `//www.profitabledisplaynetwork.com/${key}/invoke.js`;
+// Alternative script pattern (jika format berbeda)
+export const getMonetagScript = (tagId: string) => {
+  return `//cdn.monetag.com/tags/${tagId}.js`;
 };
