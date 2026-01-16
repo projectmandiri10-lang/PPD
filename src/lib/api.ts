@@ -1,16 +1,16 @@
 import { ImageItem, ApiResponse, CacheItem, UploadResponse } from '../types';
 
-// API Endpoints - Ganti dengan endpoint Google Apps Script Anda
+// API Endpoints
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
-const CACHE_DURATION = 10 * 60 * 1000; // 10 menit dalam milliseconds
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
+const PROXY_URL = `${SUPABASE_URL}/functions/v1/google-apps-proxy`;
 
-// Cache keys
+const CACHE_DURATION = 10 * 60 * 1000; // 10 menit
 const CACHE_KEY_LIST = 'image_hub_list_cache';
 const CACHE_KEY_PREFIX = 'image_hub_item_';
 
-/**
- * Get cached data jika masih valid
- */
+// ==================== CACHE FUNCTIONS ====================
+
 function getFromCache<T>(key: string): T | null {
   try {
     const cached = localStorage.getItem(key);
@@ -23,7 +23,6 @@ function getFromCache<T>(key: string): T | null {
       return parsed.data;
     }
 
-    // Cache expired, hapus
     localStorage.removeItem(key);
     return null;
   } catch {
@@ -31,9 +30,6 @@ function getFromCache<T>(key: string): T | null {
   }
 }
 
-/**
- * Simpan data ke cache
- */
 function saveToCache<T>(key: string, data: T): void {
   try {
     const cacheItem: CacheItem<T> = {
@@ -42,14 +38,10 @@ function saveToCache<T>(key: string, data: T): void {
     };
     localStorage.setItem(key, JSON.stringify(cacheItem));
   } catch {
-    // localStorage penuh atau tidak tersedia, abaikan
     console.warn('Failed to save to cache');
   }
 }
 
-/**
- * Clear all cache
- */
 export function clearCache(): void {
   try {
     const keysToRemove: string[] = [];
@@ -65,33 +57,61 @@ export function clearCache(): void {
   }
 }
 
+// ==================== JSONP HELPER (untuk GET requests) ====================
+
 /**
- * Fetch semua gambar dari Google Sheets
+ * JSONP request untuk mengatasi CORS pada GET requests ke Google Apps Script
+ * Ini adalah satu-satunya cara yang benar untuk GET tanpa CORS error
+ */
+function jsonpRequest<T>(url: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const callbackName = `jsonp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const script = document.createElement('script');
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error('JSONP request timeout'));
+    }, 30000); // 30 second timeout
+
+    const cleanup = () => {
+      clearTimeout(timeout);
+      delete (window as any)[callbackName];
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+    };
+
+    (window as any)[callbackName] = (data: T) => {
+      cleanup();
+      resolve(data);
+    };
+
+    script.onerror = () => {
+      cleanup();
+      reject(new Error('JSONP request failed'));
+    };
+
+    const separator = url.includes('?') ? '&' : '?';
+    script.src = `${url}${separator}callback=${callbackName}`;
+    document.head.appendChild(script);
+  });
+}
+
+// ==================== API FUNCTIONS ====================
+
+/**
+ * Fetch semua gambar menggunakan JSONP (GET request, no CORS issue)
  */
 export async function fetchImageList(): Promise<ApiResponse<ImageItem[]>> {
-  // Cek cache dulu
   const cached = getFromCache<ImageItem[]>(CACHE_KEY_LIST);
   if (cached) {
     return { data: cached, error: null };
   }
 
   try {
-    // Gunakan query param path=list alih-alih /list
-    const response = await fetch(`${API_BASE_URL}?path=list`);
+    const data = await jsonpRequest<ImageItem[]>(`${API_BASE_URL}?path=list`);
+    const items: ImageItem[] = Array.isArray(data) ? data : [];
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    // Google Sheets via Apps Script biasanya mengembalikan array langsung
-    // atau dalam format { data: [...] }
-    const items: ImageItem[] = Array.isArray(data) ? data : (data.data || []);
-
-    // Simpan ke cache
     saveToCache(CACHE_KEY_LIST, items);
-
     return { data: items, error: null };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to fetch images';
@@ -100,17 +120,15 @@ export async function fetchImageList(): Promise<ApiResponse<ImageItem[]>> {
 }
 
 /**
- * Fetch gambar by slug
+ * Fetch gambar by slug menggunakan JSONP
  */
 export async function fetchImageBySlug(slug: string): Promise<ApiResponse<ImageItem>> {
-  // Cek cache dulu
   const cacheKey = `${CACHE_KEY_PREFIX}${slug}`;
   const cached = getFromCache<ImageItem>(cacheKey);
   if (cached) {
     return { data: cached, error: null };
   }
 
-  // Coba cari dari list cache dulu
   const listCached = getFromCache<ImageItem[]>(CACHE_KEY_LIST);
   if (listCached) {
     const item = listCached.find(i => i.slug === slug);
@@ -121,22 +139,10 @@ export async function fetchImageBySlug(slug: string): Promise<ApiResponse<ImageI
   }
 
   try {
-    // Fetch dari API dengan query param slug
-    const response = await fetch(`${API_BASE_URL}?slug=${encodeURIComponent(slug)}`);
+    const response = await jsonpRequest<{ data: ImageItem }>(`${API_BASE_URL}?slug=${encodeURIComponent(slug)}`);
+    const item: ImageItem = response.data;
 
-    if (!response.ok) {
-      if (response.status === 404) {
-        return { data: null, error: 'Image not found' };
-      }
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const item: ImageItem = data.data || data;
-
-    // Simpan ke cache
     saveToCache(cacheKey, item);
-
     return { data: item, error: null };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to fetch image';
@@ -144,16 +150,10 @@ export async function fetchImageBySlug(slug: string): Promise<ApiResponse<ImageI
   }
 }
 
-/**
- * Generate download URL dari driveFileId
- */
 export function generateDownloadUrl(driveFileId: string): string {
   return `https://drive.google.com/uc?export=download&id=${driveFileId}`;
 }
 
-/**
- * Get final download URL (gunakan downloadUrl jika ada, atau generate dari driveFileId)
- */
 export function getDownloadUrl(item: ImageItem): string {
   if (item.downloadUrl && item.downloadUrl.trim()) {
     return item.downloadUrl;
@@ -174,27 +174,29 @@ function fileToBase64(file: File): Promise<string> {
 }
 
 /**
- * Upload image ke Google Drive via Apps Script
+ * Upload image menggunakan Supabase Edge Function proxy (POST request)
+ * Proxy akan menambahkan CORS headers yang benar
  */
 export async function uploadImage(file: File): Promise<ApiResponse<UploadResponse>> {
   try {
     const base64Content = await fileToBase64(file);
 
-    // Kirim sebagai JSON body untuk menghindari preflight CORS multipart/form-data
-    // dan memudahkan parsing di Google Apps Script
     const payload = {
-      action: 'upload',
       file: base64Content,
       fileName: file.name,
       mimeType: file.type
     };
 
-    const response = await fetch(`${API_BASE_URL}?action=upload`, {
+    // Gunakan Supabase Edge Function sebagai proxy
+    const response = await fetch(PROXY_URL, {
       method: 'POST',
       headers: {
-        'Content-Type': 'text/plain;charset=utf-8',
+        'Content-Type': 'application/json',
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        action: 'upload',
+        data: payload
+      }),
     });
 
     if (!response.ok) {
@@ -221,19 +223,19 @@ export async function uploadImage(file: File): Promise<ApiResponse<UploadRespons
 }
 
 /**
- * Simpan metadata ke Google Sheets via Apps Script
+ * Create image entry menggunakan Supabase Edge Function proxy
  */
 export async function createImageEntry(item: Omit<ImageItem, 'id' | 'createdAt'>): Promise<ApiResponse<ImageItem>> {
   try {
-    // Gunakan query param action=create
-    const response = await fetch(`${API_BASE_URL}?action=create`, {
+    const response = await fetch(PROXY_URL, {
       method: 'POST',
       headers: {
-        // PENTING: Gunakan text/plain untuk menghindari CORS preflight request (OPTIONS)
-        // Google Apps Script akan tetap bisa membaca body via e.postData.contents
-        'Content-Type': 'text/plain;charset=utf-8',
+        'Content-Type': 'application/json',
       },
-      body: JSON.stringify(item),
+      body: JSON.stringify({
+        action: 'create',
+        data: item
+      }),
     });
 
     if (!response.ok) {
@@ -242,7 +244,10 @@ export async function createImageEntry(item: Omit<ImageItem, 'id' | 'createdAt'>
 
     const data = await response.json();
 
-    // Clear cache agar data baru muncul
+    if (data.error) {
+      throw new Error(data.error);
+    }
+
     clearCache();
 
     return { data: data.data || data, error: null };
@@ -252,22 +257,16 @@ export async function createImageEntry(item: Omit<ImageItem, 'id' | 'createdAt'>
   }
 }
 
-/**
- * Generate slug dari title
- */
 export function generateSlug(title: string): string {
   return title
     .toLowerCase()
     .trim()
-    .replace(/[^\w\s-]/g, '') // Hapus karakter spesial
-    .replace(/\s+/g, '-')     // Ganti spasi dengan dash
-    .replace(/-+/g, '-')      // Hapus multiple dashes
-    .substring(0, 100);       // Batasi panjang
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .substring(0, 100);
 }
 
-/**
- * Generate Drive thumbnail URL dari file ID
- */
 export function getDriveThumbnailUrl(driveFileId: string, size: 'small' | 'medium' | 'large' = 'medium'): string {
   const sizeMap = {
     small: 's220',

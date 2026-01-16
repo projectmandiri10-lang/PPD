@@ -1,53 +1,69 @@
 /**
- * Image Download Hub - Backend API v2
- * Google Apps Script
+ * Image Download Hub - Backend API v4
+ * Google Apps Script with JSONP Support
  * 
- * Update 16 Jan 2026: Support JSON Base64 Uploads to fix CORS issues
+ * JSONP adalah satu-satunya cara untuk mengatasi CORS di Google Apps Script
  */
 
 // ==================== KONFIGURASI ====================
-// GANTI dengan ID Google Sheet Anda
 const SHEET_ID = 'YOUR_SHEET_ID_HERE';
-
-// GANTI dengan ID folder Google Drive untuk upload gambar
 const FOLDER_ID = 'YOUR_FOLDER_ID_HERE';
-
-// Nama sheet (biasanya "Sheet1")
 const SHEET_NAME = 'Sheet1';
 
 // ==================== MAIN HANDLERS ====================
 
 function doGet(e) {
   try {
+    const callback = e.parameter.callback;
     const slug = e.parameter.slug;
-    const path = e.parameter.path;
+
+    let result;
 
     if (slug) {
-      return getBySlug(slug);
+      result = getBySlugData(slug);
+    } else {
+      result = getAllData();
     }
 
-    return getAll();
+    // JSONP Response
+    if (callback) {
+      return ContentService
+        .createTextOutput(`${callback}(${JSON.stringify(result)})`)
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+
+    // Regular JSON Response
+    return ContentService
+      .createTextOutput(JSON.stringify(result))
+      .setMimeType(ContentService.MimeType.JSON);
+
   } catch (error) {
-    return createResponse({ error: error.message }, 500);
+    const errorResponse = { error: error.message };
+    const callback = e.parameter.callback;
+
+    if (callback) {
+      return ContentService
+        .createTextOutput(`${callback}(${JSON.stringify(errorResponse)})`)
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+
+    return ContentService
+      .createTextOutput(JSON.stringify(errorResponse))
+      .setMimeType(ContentService.MimeType.JSON);
   }
 }
 
 function doPost(e) {
   try {
-    // 1. Coba baca action dari Query Param
     let action = e.parameter.action;
-
-    // 2. Coba baca data body (JSON string)
-    // Walaupun dikirim sebagai text/plain, kita bisa parse manual
     let data = {};
+
+    // Parse body sebagai JSON
     if (e.postData && e.postData.contents) {
       try {
         data = JSON.parse(e.postData.contents);
-
-        // Jika action ada di body, gunakan itu (override query param)
         if (data.action) action = data.action;
       } catch (err) {
-        // Body bukan JSON valid, mungkin form encoded biasa
         data = e.parameter;
       }
     } else {
@@ -56,34 +72,33 @@ function doPost(e) {
 
     // Router
     if (action === 'upload') {
-      return handleUpload(data);
+      return createJsonResponse(handleUploadData(data));
     }
 
     if (action === 'create') {
-      return handleCreate(data);
+      return createJsonResponse(handleCreateData(data));
     }
 
-    // Default fallback jika tidak ada action spesifik
-    if (data.file || (data.file && data.file.includes('base64'))) {
-      return handleUpload(data);
+    // Fallback detection
+    if (data.file) {
+      return createJsonResponse(handleUploadData(data));
     }
 
-    // Assume create entry otherwise
-    return handleCreate(data);
+    return createJsonResponse(handleCreateData(data));
 
   } catch (error) {
-    return createResponse({ error: error.message }, 500);
+    return createJsonResponse({ error: error.message });
   }
 }
 
 // ==================== API FUNCTIONS ====================
 
-function getAll() {
+function getAllData() {
   const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
   const data = sheet.getDataRange().getValues();
 
   if (data.length <= 1) {
-    return createResponse([]);
+    return [];
   }
 
   const headers = data[0];
@@ -91,7 +106,7 @@ function getAll() {
 
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
-    if (!row[0]) continue; // Skip empty rows
+    if (!row[0]) continue;
 
     const item = {};
     headers.forEach((header, index) => {
@@ -100,18 +115,17 @@ function getAll() {
     items.push(item);
   }
 
-  // Sort by createdAt descending
   items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-  return createResponse(items);
+  return items;
 }
 
-function getBySlug(slug) {
+function getBySlugData(slug) {
   const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
   const data = sheet.getDataRange().getValues();
 
   if (data.length <= 1) {
-    return createResponse({ error: 'Not found', data: null }, 404);
+    return { error: 'Not found', data: null };
   }
 
   const headers = data[0];
@@ -123,14 +137,14 @@ function getBySlug(slug) {
       headers.forEach((header, index) => {
         item[header] = data[i][index] || '';
       });
-      return createResponse({ data: item });
+      return { data: item };
     }
   }
 
-  return createResponse({ error: 'Not found', data: null }, 404);
+  return { error: 'Not found', data: null };
 }
 
-function handleCreate(data) {
+function handleCreateData(data) {
   try {
     const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
@@ -151,35 +165,31 @@ function handleCreate(data) {
       item[header] = row[index];
     });
 
-    return createResponse({ data: item, message: 'Created successfully' });
+    return { data: item, message: 'Created successfully' };
   } catch (error) {
-    return createResponse({ error: 'Create failed: ' + error.message }, 500);
+    return { error: 'Create failed: ' + error.message };
   }
 }
 
-function handleUpload(data) {
+function handleUploadData(data) {
   try {
     const folder = DriveApp.getFolderById(FOLDER_ID);
 
-    // Ambil data file
-    // Format: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA..." atau raw base64
     let fileContent = data.file;
     const fileName = data.fileName || 'uploaded-image-' + Date.now();
     const mimeType = data.mimeType || 'image/png';
 
     if (!fileContent) {
-      return createResponse({ error: 'No file content found' }, 400);
+      return { error: 'No file content found' };
     }
 
-    let blob;
-
-    // Clean base64 string if it contains prefix
+    // Clean base64 string
     if (fileContent.includes('base64,')) {
       fileContent = fileContent.split('base64,')[1];
     }
 
     const decoded = Utilities.base64Decode(fileContent);
-    blob = Utilities.newBlob(decoded, mimeType, fileName);
+    const blob = Utilities.newBlob(decoded, mimeType, fileName);
 
     // Upload to Drive
     const file = folder.createFile(blob);
@@ -188,24 +198,24 @@ function handleUpload(data) {
     const fileId = file.getId();
     const thumbnailUrl = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=s400';
 
-    return createResponse({
+    return {
       driveFileId: fileId,
       thumbnailUrl: thumbnailUrl,
       fileUrl: file.getUrl(),
       message: 'File uploaded successfully'
-    });
+    };
 
   } catch (error) {
-    return createResponse({ error: 'Upload failed: ' + error.message }, 500);
+    return { error: 'Upload failed: ' + error.message };
   }
 }
 
 // ==================== HELPER FUNCTIONS ====================
 
-function createResponse(data, statusCode = 200) {
-  const output = ContentService.createTextOutput(JSON.stringify(data));
-  output.setMimeType(ContentService.MimeType.JSON);
-  return output;
+function createJsonResponse(data) {
+  return ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 // ==================== SETUP FUNCTIONS ====================
