@@ -1,0 +1,15 @@
+# robots.txt for Image Download Hub
+# Ganti https://yourdomain.com dengan domain asli Anda
+
+User-agent: *
+Allow: /
+
+# Halaman yang tidak perlu di-index
+Disallow: /#/admin
+Disallow: /#/d/*
+
+# Sitemap location
+Sitemap: https://yourdomain.com/sitemap.xml
+
+# Crawl-delay (opsional, untuk mencegah overload)
+Crawl-delay: 1

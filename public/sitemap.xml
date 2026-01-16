@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <!-- 
+    CATATAN: Ini adalah sitemap statis dasar.
+    Untuk sitemap dinamis, Anda perlu generate sitemap.xml dari data
+    menggunakan script build atau server-side generation.
+    
+    Ganti https://yourdomain.com dengan domain asli Anda.
+  -->
+  
+  <!-- Homepage -->
+  <url>
+    <loc>https://yourdomain.com/</loc>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  
+  <!-- 
+    Untuk halaman post dinamis (/#/p/slug), tambahkan secara manual
+    atau generate otomatis dari data:
+    
+    <url>
+      <loc>https://yourdomain.com/#/p/nama-gambar-1</loc>
+      <changefreq>weekly</changefreq>
+      <priority>0.8</priority>
+    </url>
+    
+    <url>
+      <loc>https://yourdomain.com/#/p/nama-gambar-2</loc>
+      <changefreq>weekly</changefreq>
+      <priority>0.8</priority>
+    </url>
+  -->
+</urlset>
