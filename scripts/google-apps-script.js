@@ -1,279 +1,237 @@
 /**
- * Google Apps Script untuk Image Download Hub
+ * Image Download Hub - Backend API v2
+ * Google Apps Script
  * 
- * SETUP:
- * 1. Buat Google Sheet baru dengan kolom: id, title, slug, thumbnailUrl, driveFileId, downloadUrl, createdAt
- * 2. Buat Google Drive folder untuk menyimpan gambar
- * 3. Copy script ini ke Apps Script (Extensions > Apps Script)
- * 4. Update SHEET_ID dan FOLDER_ID di bawah
- * 5. Deploy sebagai Web App dengan akses "Anyone"
+ * Update 16 Jan 2026: Support JSON Base64 Uploads to fix CORS issues
  */
 
 // ==================== KONFIGURASI ====================
-// Ganti dengan ID Google Sheet Anda
-const SHEET_ID = 'YOUR_GOOGLE_SHEET_ID';
+// GANTI dengan ID Google Sheet Anda
+const SHEET_ID = 'YOUR_SHEET_ID_HERE';
 
-// Ganti dengan ID Google Drive folder untuk upload
-const FOLDER_ID = 'YOUR_GOOGLE_DRIVE_FOLDER_ID';
+// GANTI dengan ID folder Google Drive untuk upload gambar
+const FOLDER_ID = 'YOUR_FOLDER_ID_HERE';
 
-// Nama sheet yang digunakan
+// Nama sheet (biasanya "Sheet1")
 const SHEET_NAME = 'Sheet1';
 
-// ==================== UTILITIES ====================
+// ==================== MAIN HANDLERS ====================
 
-function getSheet() {
-  return SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
-}
-
-function generateId() {
-  return Utilities.getUuid();
-}
-
-function getCurrentTimestamp() {
-  return new Date().toISOString();
-}
-
-// CORS headers
-function createCorsResponse(data) {
-  const output = ContentService.createTextOutput(JSON.stringify(data));
-  output.setMimeType(ContentService.MimeType.JSON);
-  return output;
-}
-
-// ==================== API HANDLERS ====================
-
-/**
- * Handle GET requests
- * - /list - Get all images
- * - /get?slug=xxx - Get single image by slug
- */
 function doGet(e) {
   try {
-    const path = e.parameter.path || 'list';
     const slug = e.parameter.slug;
-    
+    const path = e.parameter.path;
+
     if (slug) {
-      // Get by slug
       return getBySlug(slug);
     }
-    
-    // Get all
+
     return getAll();
-    
   } catch (error) {
-    return createCorsResponse({ error: error.message });
+    return createResponse({ error: error.message }, 500);
   }
 }
 
-/**
- * Handle POST requests
- * - /upload - Upload image to Drive
- * - /create - Create new entry
- */
 function doPost(e) {
   try {
-    const action = e.parameter.action;
-    
-    if (action === 'upload') {
-      return handleUpload(e);
-    }
-    
-    if (action === 'create') {
-      return handleCreate(e);
-    }
-    
-    // Default: try to parse as create
+    // 1. Coba baca action dari Query Param
+    let action = e.parameter.action;
+
+    // 2. Coba baca data body (JSON string)
+    // Walaupun dikirim sebagai text/plain, kita bisa parse manual
+    let data = {};
     if (e.postData && e.postData.contents) {
-      return handleCreate(e);
+      try {
+        data = JSON.parse(e.postData.contents);
+
+        // Jika action ada di body, gunakan itu (override query param)
+        if (data.action) action = data.action;
+      } catch (err) {
+        // Body bukan JSON valid, mungkin form encoded biasa
+        data = e.parameter;
+      }
+    } else {
+      data = e.parameter;
     }
-    
-    return createCorsResponse({ error: 'Invalid action' });
-    
+
+    // Router
+    if (action === 'upload') {
+      return handleUpload(data);
+    }
+
+    if (action === 'create') {
+      return handleCreate(data);
+    }
+
+    // Default fallback jika tidak ada action spesifik
+    if (data.file || (data.file && data.file.includes('base64'))) {
+      return handleUpload(data);
+    }
+
+    // Assume create entry otherwise
+    return handleCreate(data);
+
   } catch (error) {
-    return createCorsResponse({ error: error.message });
+    return createResponse({ error: error.message }, 500);
   }
 }
 
-// ==================== API IMPLEMENTATIONS ====================
+// ==================== API FUNCTIONS ====================
 
-/**
- * Get all images from sheet
- */
 function getAll() {
-  const sheet = getSheet();
+  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
   const data = sheet.getDataRange().getValues();
-  
+
   if (data.length <= 1) {
-    return createCorsResponse([]);
+    return createResponse([]);
   }
-  
+
   const headers = data[0];
   const items = [];
-  
+
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
+    if (!row[0]) continue; // Skip empty rows
+
     const item = {};
-    
     headers.forEach((header, index) => {
       item[header] = row[index] || '';
     });
-    
     items.push(item);
   }
-  
-  // Sort by createdAt descending (newest first)
+
+  // Sort by createdAt descending
   items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  
-  return createCorsResponse(items);
+
+  return createResponse(items);
 }
 
-/**
- * Get single image by slug
- */
 function getBySlug(slug) {
-  const sheet = getSheet();
+  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
   const data = sheet.getDataRange().getValues();
-  
+
   if (data.length <= 1) {
-    return createCorsResponse({ error: 'Not found', data: null });
+    return createResponse({ error: 'Not found', data: null }, 404);
   }
-  
+
   const headers = data[0];
   const slugIndex = headers.indexOf('slug');
-  
+
   for (let i = 1; i < data.length; i++) {
     if (data[i][slugIndex] === slug) {
       const item = {};
       headers.forEach((header, index) => {
         item[header] = data[i][index] || '';
       });
-      return createCorsResponse({ data: item });
+      return createResponse({ data: item });
     }
   }
-  
-  return createCorsResponse({ error: 'Not found', data: null });
+
+  return createResponse({ error: 'Not found', data: null }, 404);
 }
 
-/**
- * Handle file upload to Google Drive
- */
-function handleUpload(e) {
+function handleCreate(data) {
   try {
-    const folder = DriveApp.getFolderById(FOLDER_ID);
-    
-    // Get file from form data
-    const file = e.parameter.file;
-    const fileName = e.parameter.fileName || 'uploaded-image';
-    const mimeType = e.parameter.mimeType || 'image/png';
-    
-    // Decode base64 if needed
-    let blob;
-    if (typeof file === 'string' && file.includes('base64')) {
-      const base64Data = file.split(',')[1];
-      blob = Utilities.newBlob(Utilities.base64Decode(base64Data), mimeType, fileName);
-    } else {
-      blob = Utilities.newBlob(file, mimeType, fileName);
-    }
-    
-    // Upload to Drive
-    const uploadedFile = folder.createFile(blob);
-    uploadedFile.setSharing(DriveApp.Access.ANYONE, DriveApp.Permission.VIEW);
-    
-    const fileId = uploadedFile.getId();
-    const thumbnailUrl = `https://drive.google.com/thumbnail?id=${fileId}&sz=s400`;
-    
-    return createCorsResponse({
-      driveFileId: fileId,
-      thumbnailUrl: thumbnailUrl,
-      fileUrl: uploadedFile.getUrl()
-    });
-    
-  } catch (error) {
-    return createCorsResponse({ error: 'Upload failed: ' + error.message });
-  }
-}
-
-/**
- * Create new entry in sheet
- */
-function handleCreate(e) {
-  try {
-    let data;
-    
-    if (e.postData && e.postData.contents) {
-      data = JSON.parse(e.postData.contents);
-    } else {
-      data = {
-        title: e.parameter.title,
-        slug: e.parameter.slug,
-        thumbnailUrl: e.parameter.thumbnailUrl,
-        driveFileId: e.parameter.driveFileId,
-        downloadUrl: e.parameter.downloadUrl || ''
-      };
-    }
-    
-    const sheet = getSheet();
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    
-    // Generate ID and timestamp
-    const id = generateId();
-    const createdAt = getCurrentTimestamp();
-    
-    // Build row
+
+    const id = Utilities.getUuid();
+    const createdAt = new Date().toISOString();
+
     const row = headers.map(header => {
       if (header === 'id') return id;
       if (header === 'createdAt') return createdAt;
       return data[header] || '';
     });
-    
-    // Append to sheet
+
     sheet.appendRow(row);
-    
-    // Return created item
+
     const item = {};
     headers.forEach((header, index) => {
       item[header] = row[index];
     });
-    
-    return createCorsResponse({ data: item });
-    
+
+    return createResponse({ data: item, message: 'Created successfully' });
   } catch (error) {
-    return createCorsResponse({ error: 'Create failed: ' + error.message });
+    return createResponse({ error: 'Create failed: ' + error.message }, 500);
+  }
+}
+
+function handleUpload(data) {
+  try {
+    const folder = DriveApp.getFolderById(FOLDER_ID);
+
+    // Ambil data file
+    // Format: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA..." atau raw base64
+    let fileContent = data.file;
+    const fileName = data.fileName || 'uploaded-image-' + Date.now();
+    const mimeType = data.mimeType || 'image/png';
+
+    if (!fileContent) {
+      return createResponse({ error: 'No file content found' }, 400);
+    }
+
+    let blob;
+
+    // Clean base64 string if it contains prefix
+    if (fileContent.includes('base64,')) {
+      fileContent = fileContent.split('base64,')[1];
+    }
+
+    const decoded = Utilities.base64Decode(fileContent);
+    blob = Utilities.newBlob(decoded, mimeType, fileName);
+
+    // Upload to Drive
+    const file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE, DriveApp.Permission.VIEW);
+
+    const fileId = file.getId();
+    const thumbnailUrl = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=s400';
+
+    return createResponse({
+      driveFileId: fileId,
+      thumbnailUrl: thumbnailUrl,
+      fileUrl: file.getUrl(),
+      message: 'File uploaded successfully'
+    });
+
+  } catch (error) {
+    return createResponse({ error: 'Upload failed: ' + error.message }, 500);
   }
 }
 
 // ==================== HELPER FUNCTIONS ====================
 
-/**
- * Initialize sheet with headers (run once manually)
- */
-function initializeSheet() {
-  const sheet = getSheet();
-  const headers = ['id', 'title', 'slug', 'thumbnailUrl', 'driveFileId', 'downloadUrl', 'createdAt'];
-  
-  if (sheet.getLastRow() === 0) {
-    sheet.appendRow(headers);
-  }
-  
-  Logger.log('Sheet initialized with headers');
+function createResponse(data, statusCode = 200) {
+  const output = ContentService.createTextOutput(JSON.stringify(data));
+  output.setMimeType(ContentService.MimeType.JSON);
+  return output;
 }
 
-/**
- * Test function to verify setup
- */
+// ==================== SETUP FUNCTIONS ====================
+
+function initializeSheet() {
+  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
+  const headers = ['id', 'title', 'slug', 'thumbnailUrl', 'driveFileId', 'downloadUrl', 'createdAt'];
+
+  const firstRow = sheet.getRange(1, 1, 1, 7).getValues()[0];
+  if (firstRow[0] !== 'id') {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+
+  Logger.log('Sheet initialized successfully!');
+}
+
 function testSetup() {
-  Logger.log('Sheet ID: ' + SHEET_ID);
-  Logger.log('Folder ID: ' + FOLDER_ID);
-  
   try {
-    const sheet = getSheet();
-    Logger.log('Sheet found: ' + sheet.getName());
-    
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
+    Logger.log('✓ Sheet connected: ' + sheet.getName());
+
     const folder = DriveApp.getFolderById(FOLDER_ID);
-    Logger.log('Folder found: ' + folder.getName());
-    
+    Logger.log('✓ Folder connected: ' + folder.getName());
+
     Logger.log('Setup OK!');
   } catch (error) {
-    Logger.log('Error: ' + error.message);
+    Logger.log('✗ Error: ' + error.message);
   }
 }

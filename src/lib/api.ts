@@ -15,14 +15,14 @@ function getFromCache<T>(key: string): T | null {
   try {
     const cached = localStorage.getItem(key);
     if (!cached) return null;
-    
+
     const parsed: CacheItem<T> = JSON.parse(cached);
     const now = Date.now();
-    
+
     if (now - parsed.timestamp < CACHE_DURATION) {
       return parsed.data;
     }
-    
+
     // Cache expired, hapus
     localStorage.removeItem(key);
     return null;
@@ -76,21 +76,22 @@ export async function fetchImageList(): Promise<ApiResponse<ImageItem[]>> {
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/list`);
-    
+    // Gunakan query param path=list alih-alih /list
+    const response = await fetch(`${API_BASE_URL}?path=list`);
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
+
     const data = await response.json();
-    
+
     // Google Sheets via Apps Script biasanya mengembalikan array langsung
     // atau dalam format { data: [...] }
     const items: ImageItem[] = Array.isArray(data) ? data : (data.data || []);
-    
+
     // Simpan ke cache
     saveToCache(CACHE_KEY_LIST, items);
-    
+
     return { data: items, error: null };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to fetch images';
@@ -120,22 +121,22 @@ export async function fetchImageBySlug(slug: string): Promise<ApiResponse<ImageI
   }
 
   try {
-    // Fetch dari API
-    const response = await fetch(`${API_BASE_URL}/get?slug=${encodeURIComponent(slug)}`);
-    
+    // Fetch dari API dengan query param slug
+    const response = await fetch(`${API_BASE_URL}?slug=${encodeURIComponent(slug)}`);
+
     if (!response.ok) {
       if (response.status === 404) {
         return { data: null, error: 'Image not found' };
       }
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
+
     const data = await response.json();
     const item: ImageItem = data.data || data;
-    
+
     // Simpan ke cache
     saveToCache(cacheKey, item);
-    
+
     return { data: item, error: null };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to fetch image';
@@ -161,30 +162,57 @@ export function getDownloadUrl(item: ImageItem): string {
 }
 
 /**
+ * Helper: Convert File to Base64
+ */
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = error => reject(error);
+  });
+}
+
+/**
  * Upload image ke Google Drive via Apps Script
  */
 export async function uploadImage(file: File): Promise<ApiResponse<UploadResponse>> {
   try {
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    const response = await fetch(`${API_BASE_URL}/upload`, {
+    const base64Content = await fileToBase64(file);
+
+    // Kirim sebagai JSON body untuk menghindari preflight CORS multipart/form-data
+    // dan memudahkan parsing di Google Apps Script
+    const payload = {
+      action: 'upload',
+      file: base64Content,
+      fileName: file.name,
+      mimeType: file.type
+    };
+
+    const response = await fetch(`${API_BASE_URL}?action=upload`, {
       method: 'POST',
-      body: formData,
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8',
+      },
+      body: JSON.stringify(payload),
     });
-    
+
     if (!response.ok) {
       throw new Error(`Upload failed with status: ${response.status}`);
     }
-    
+
     const data = await response.json();
-    
-    return { 
+
+    if (data.error) {
+      throw new Error(data.error);
+    }
+
+    return {
       data: {
         driveFileId: data.driveFileId || data.fileId,
         thumbnailUrl: data.thumbnailUrl || data.url,
-      }, 
-      error: null 
+      },
+      error: null
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to upload image';
@@ -197,23 +225,26 @@ export async function uploadImage(file: File): Promise<ApiResponse<UploadRespons
  */
 export async function createImageEntry(item: Omit<ImageItem, 'id' | 'createdAt'>): Promise<ApiResponse<ImageItem>> {
   try {
-    const response = await fetch(`${API_BASE_URL}/create`, {
+    // Gunakan query param action=create
+    const response = await fetch(`${API_BASE_URL}?action=create`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        // PENTING: Gunakan text/plain untuk menghindari CORS preflight request (OPTIONS)
+        // Google Apps Script akan tetap bisa membaca body via e.postData.contents
+        'Content-Type': 'text/plain;charset=utf-8',
       },
       body: JSON.stringify(item),
     });
-    
+
     if (!response.ok) {
       throw new Error(`Create failed with status: ${response.status}`);
     }
-    
+
     const data = await response.json();
-    
+
     // Clear cache agar data baru muncul
     clearCache();
-    
+
     return { data: data.data || data, error: null };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to create entry';
