@@ -6,6 +6,7 @@ export interface ImageItem {
   driveFileId: string;
   downloadUrl: string;
   createdAt: string;
+  uploadedBy?: string; // Track who uploaded the image
 }
 
 export interface ApiResponse<T> {
