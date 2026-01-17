@@ -39,12 +39,9 @@ function Post() {
     loadItem()
   }, [slug, navigate])
 
-  // Get image URL - prefer thumbnailUrl, fallback to Drive thumbnail
+  // Get image URL - Always use helper to ensure mobile compatibility
   const getImageUrl = (item: ImageItem) => {
-    if (item.thumbnailUrl && item.thumbnailUrl.trim()) {
-      return item.thumbnailUrl
-    }
-    return getDriveThumbnailUrl(item.driveFileId)
+    return getDriveThumbnailUrl(item.driveFileId, 's1600') // High res for detail page
   }
 
   if (loading) {

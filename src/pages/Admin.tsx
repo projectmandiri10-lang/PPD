@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Helmet } from 'react-helmet-async'
-import { generateSlug, uploadImage, createImageEntry, clearCache, fetchImageList, getDownloadUrl } from '../lib/api'
+import { generateSlug, uploadImage, createImageEntry, clearCache, fetchImageList, getDownloadUrl, getDriveThumbnailUrl } from '../lib/api'
 import type { ImageItem } from '../types'
 
 const ADMIN_TOKEN_KEY = 'admin_auth_token'
@@ -329,7 +329,7 @@ function Admin() {
         slug: slug.trim(),
         thumbnailUrl,
         driveFileId,
-        downloadUrl: '', // Always empty, using Google Drive link
+        downloadUrl: `https://drive.google.com/uc?id=${driveFileId}&export=download`, // Auto-generate download URL
         uploadedBy: currentUser
       })
 
@@ -764,7 +764,7 @@ function Admin() {
                       <div className="flex flex-col sm:flex-row gap-4">
                         <div className="flex-shrink-0">
                           <img
-                            src={image.thumbnailUrl || `https://drive.google.com/thumbnail?id=${image.driveFileId}&sz=s200`}
+                            src={getDriveThumbnailUrl(image.driveFileId)}
                             alt={image.title}
                             className="w-full sm:w-32 h-32 object-cover rounded-lg bg-gray-100"
                           />

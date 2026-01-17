@@ -25,11 +25,8 @@ function GalleryItem({ image }: GalleryItemProps) {
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState(false)
 
-  // Get thumbnail URL - prefer thumbnailUrl, fallback to Drive thumbnail
+  // Get thumbnail URL - Always use helper to ensure mobile compatibility
   const getImageUrl = () => {
-    if (image.thumbnailUrl && image.thumbnailUrl.trim()) {
-      return image.thumbnailUrl
-    }
     return getDriveThumbnailUrl(image.driveFileId)
   }
 
