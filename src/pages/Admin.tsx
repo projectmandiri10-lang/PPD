@@ -82,18 +82,23 @@ function Admin() {
   useEffect(() => {
     loadOperators()
 
-    const token = localStorage.getItem(ADMIN_TOKEN_KEY)
-    if (token) {
-      // Check if admin
-      if (token.startsWith('admin:')) {
-        const adminEmail = token.replace('admin:', '')
-        setUserRole('admin')
-        setCurrentUser(adminEmail)
-        return
+    // Check Supabase session for admin
+    const checkAuth = async () => {
+      const { supabase, getUserRole } = await import('../lib/supabase')
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (session?.user) {
+        const { role } = await getUserRole()
+        if (role === 'admin') {
+          setUserRole('admin')
+          setCurrentUser(session.user.email || '')
+          return
+        }
       }
 
-      // Check if operator (still using localStorage temporarily)
-      if (token.startsWith('operator:')) {
+      // Check localStorage for operator
+      const token = localStorage.getItem(ADMIN_TOKEN_KEY)
+      if (token && token.startsWith('operator:')) {
         const opUsername = token.replace('operator:', '')
         const stored = localStorage.getItem(OPERATORS_STORAGE_KEY)
         if (stored) {
@@ -101,11 +106,17 @@ function Admin() {
           const op = ops.find(o => o.username === opUsername)
           if (op) {
             setUserRole('operator')
-            setCurrentUser(op.username)
+            setCurrentUser(opUsername)
+            return
           }
         }
       }
+
+      // No valid session
+      localStorage.removeItem(ADMIN_TOKEN_KEY)
     }
+
+    checkAuth()
   }, [])
 
   // Auto-generate slug from title
@@ -137,48 +148,92 @@ function Admin() {
     setListLoading(false)
   }
 
-  const handleLogin = useCallback((e: React.FormEvent) => {
+  const handleLogin = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
     setAuthError('')
+    setLoading(true)
 
-    if (loginType === 'admin') {
-      // Simple admin login - untuk sementara gunakan email sebagai identifier
-      // Nanti bisa diupgrade ke full Supabase Auth
-      if (email && password) {
-        localStorage.setItem(ADMIN_TOKEN_KEY, `admin:${email}`)
-        setUserRole('admin')
-        setCurrentUser(email)
-      } else {
-        setAuthError('Please enter email and password')
-      }
-    } else {
-      // Operator login
-      const stored = localStorage.getItem(OPERATORS_STORAGE_KEY)
-      if (stored) {
-        const ops: Operator[] = JSON.parse(stored)
-        const op = ops.find(o => o.username === username && o.password === password)
-        if (op) {
-          localStorage.setItem(ADMIN_TOKEN_KEY, `operator:${op.username}`)
-          setUserRole('operator')
-          setCurrentUser(op.username)
-        } else {
-          setAuthError('Invalid operator credentials')
+    try {
+      if (loginType === 'admin') {
+        // Admin login with Supabase Auth
+        const { supabase, getUserRole } = await import('../lib/supabase')
+
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password: password
+        })
+
+        if (error) {
+          setAuthError('Invalid email or password')
+          setLoading(false)
+          return
         }
-      } else {
-        setAuthError('No operators registered')
-      }
-    }
-  }, [loginType, email, username, password])
 
-  const handleLogout = useCallback(() => {
-    localStorage.removeItem(ADMIN_TOKEN_KEY)
+        if (!data.user) {
+          setAuthError('Login failed')
+          setLoading(false)
+          return
+        }
+
+        // Get user role from database
+        const { role, error: roleError } = await getUserRole()
+
+        if (roleError || !role) {
+          setAuthError('User not authorized. Please contact administrator.')
+          await supabase.auth.signOut()
+          setLoading(false)
+          return
+        }
+
+        if (role !== 'admin') {
+          setAuthError('Access denied. Admin privileges required.')
+          await supabase.auth.signOut()
+          setLoading(false)
+          return
+        }
+
+        // Success - set admin role
+        setUserRole('admin')
+        setCurrentUser(data.user.email || '')
+        setLoading(false)
+      } else {
+        // Operator login (localStorage - temporary)
+        const stored = localStorage.getItem(OPERATORS_STORAGE_KEY)
+        if (stored) {
+          const ops: Operator[] = JSON.parse(stored)
+          const op = ops.find(o => o.username === username && o.password === password)
+          if (op) {
+            localStorage.setItem(ADMIN_TOKEN_KEY, `operator:${op.username}`)
+            setUserRole('operator')
+            setCurrentUser(op.username)
+          } else {
+            setAuthError('Invalid operator credentials')
+          }
+        } else {
+          setAuthError('No operators found')
+        }
+        setLoading(false)
+      }
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Login failed')
+      setLoading(false)
+    }
+  }, [loginType, email, password, username])
+
+  const handleLogout = useCallback(async () => {
+    if (userRole === 'admin') {
+      const { supabase } = await import('../lib/supabase')
+      await supabase.auth.signOut()
+    } else {
+      localStorage.removeItem(ADMIN_TOKEN_KEY)
+    }
     setUserRole(null)
     setCurrentUser('')
     setEmail('')
     setUsername('')
     setPassword('')
     setActiveTab('list')
-  }, [])
+  }, [userRole])
 
   const handleImageChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
