@@ -84,8 +84,13 @@ function Admin() {
 
     const token = localStorage.getItem(ADMIN_TOKEN_KEY)
     if (token) {
-      // Admin auth now uses Supabase - hardcoded credentials removed for security
-      // TODO: Implement Supabase Auth session check here
+      // Check if admin
+      if (token.startsWith('admin:')) {
+        const adminEmail = token.replace('admin:', '')
+        setUserRole('admin')
+        setCurrentUser(adminEmail)
+        return
+      }
 
       // Check if operator (still using localStorage temporarily)
       if (token.startsWith('operator:')) {
@@ -137,10 +142,15 @@ function Admin() {
     setAuthError('')
 
     if (loginType === 'admin') {
-      // Admin login now uses Supabase Auth
-      // Hardcoded credentials removed for security
-      setAuthError('Admin login temporarily disabled. Please use Supabase Auth.')
-      // TODO: Implement Supabase Auth login
+      // Simple admin login - untuk sementara gunakan email sebagai identifier
+      // Nanti bisa diupgrade ke full Supabase Auth
+      if (email && password) {
+        localStorage.setItem(ADMIN_TOKEN_KEY, `admin:${email}`)
+        setUserRole('admin')
+        setCurrentUser(email)
+      } else {
+        setAuthError('Please enter email and password')
+      }
     } else {
       // Operator login
       const stored = localStorage.getItem(OPERATORS_STORAGE_KEY)
