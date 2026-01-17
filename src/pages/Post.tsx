@@ -3,7 +3,6 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { fetchImageBySlug, getDriveThumbnailUrl } from '../lib/api'
 import MonetagNativeBanner from '../components/ads/MonetagNativeBanner'
-import MonetagMultitag from '../components/ads/MonetagMultitag'
 import type { ImageItem } from '../types'
 
 const siteName = import.meta.env.VITE_SITE_NAME || 'Image Download Hub'
@@ -297,8 +296,7 @@ function Post() {
           </div>
         </div>
 
-        {/* Ad - Multitag (Includes Social Bar, Vignette, etc) */}
-        <MonetagMultitag />
+        {/* Ad - Social Bar / Multitag handled globally via index.html */}
       </div>
     </>
   )
