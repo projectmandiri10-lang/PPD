@@ -11,34 +11,42 @@ function Layout() {
       {/* Header */}
       <header className="bg-white shadow-sm sticky top-0 z-50">
         <div className="container-main">
-          <div className="flex items-center justify-between h-16">
-            <Link 
-              to="/" 
-              className="text-xl font-bold text-primary-600 hover:text-primary-700 transition-colors"
-            >
-              {siteName}
-            </Link>
-            
-            <nav className="flex items-center gap-4">
-              <Link 
-                to="/" 
-                className={`text-sm font-medium transition-colors ${
-                  location.pathname === '/' 
-                    ? 'text-primary-600' 
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
+          <div className="flex items-center h-16">
+            {/* Logo - Left */}
+            <div className="flex-shrink-0 z-10">
+              <Link
+                to="/"
+                className="text-xl font-bold text-primary-600 hover:text-primary-700 transition-colors"
               >
-                Home
+                {siteName}
               </Link>
-              {!isAdmin && (
-                <Link 
-                  to="/admin" 
-                  className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+            </div>
+
+            {/* Navigation - Centered */}
+            <nav className="flex-1 flex items-center justify-center gap-6 absolute inset-x-0 h-16 pointer-events-none">
+              <div className="pointer-events-auto flex items-center gap-6">
+                <Link
+                  to="/"
+                  className={`text-sm font-medium transition-colors ${location.pathname === '/'
+                      ? 'text-primary-600'
+                      : 'text-gray-600 hover:text-gray-900'
+                    }`}
                 >
-                  Admin
+                  Home
                 </Link>
-              )}
+                {!isAdmin && (
+                  <Link
+                    to="/admin"
+                    className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    Login
+                  </Link>
+                )}
+              </div>
             </nav>
+
+            {/* Spacer for Right side balance if needed, or actions */}
+            <div className="flex-shrink-0 w-[100px] hidden sm:block"></div>
           </div>
         </div>
       </header>
@@ -56,20 +64,20 @@ function Layout() {
               &copy; {new Date().getFullYear()} {siteName}. All rights reserved.
             </p>
             <div className="flex items-center gap-4">
-              <Link 
-                to="/" 
+              <Link
+                to="/"
                 className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
               >
                 Home
               </Link>
-              <a 
-                href="#/privacy" 
+              <a
+                href="#/privacy"
                 className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
               >
                 Privacy
               </a>
-              <a 
-                href="#/terms" 
+              <a
+                href="#/terms"
                 className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
               >
                 Terms
