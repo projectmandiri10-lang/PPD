@@ -32,3 +32,6 @@ Thumbs.db
 # Documentation (keep local only, synced with Google Drive)
 *.md
 !node_modules/**/*.md
+
+# Google Apps Script (contains sensitive IDs)
+scripts/google-apps-script.js
