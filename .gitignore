@@ -28,3 +28,7 @@ Thumbs.db
 
 # Local Netlify folder
 .netlify
+
+# Documentation (keep local only, synced with Google Drive)
+*.md
+!node_modules/**/*.md

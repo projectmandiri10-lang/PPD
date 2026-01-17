@@ -84,14 +84,10 @@ function Admin() {
 
     const token = localStorage.getItem(ADMIN_TOKEN_KEY)
     if (token) {
-      // Check if admin
-      if (token === `admin:${ADMIN_EMAIL}:${ADMIN_PASSWORD}` && ADMIN_EMAIL !== '' && ADMIN_PASSWORD !== '') {
-        setUserRole('admin')
-        setCurrentUser(ADMIN_EMAIL)
-        return
-      }
+      // Admin auth now uses Supabase - hardcoded credentials removed for security
+      // TODO: Implement Supabase Auth session check here
 
-      // Check if operator
+      // Check if operator (still using localStorage temporarily)
       if (token.startsWith('operator:')) {
         const opUsername = token.replace('operator:', '')
         const stored = localStorage.getItem(OPERATORS_STORAGE_KEY)
@@ -141,14 +137,10 @@ function Admin() {
     setAuthError('')
 
     if (loginType === 'admin') {
-      // Admin login
-      if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-        localStorage.setItem(ADMIN_TOKEN_KEY, `admin:${email}:${password}`)
-        setUserRole('admin')
-        setCurrentUser(email)
-      } else {
-        setAuthError('Invalid admin credentials')
-      }
+      // Admin login now uses Supabase Auth
+      // Hardcoded credentials removed for security
+      setAuthError('Admin login temporarily disabled. Please use Supabase Auth.')
+      // TODO: Implement Supabase Auth login
     } else {
       // Operator login
       const stored = localStorage.getItem(OPERATORS_STORAGE_KEY)
