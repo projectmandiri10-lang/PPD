@@ -82,8 +82,8 @@ function Admin() {
       if (response.ok && result.data) {
         // Map Supabase users to Operator interface
         const ops: Operator[] = result.data.map((u: any) => ({
-          id: u.id,
-          username: u.email, // Map email to username for compatibility
+          id: u.user_id, // Use user_id (Auth UUID) instead of row id
+          username: u.email,
           password: '***', // Password not available
           createdAt: u.created_at
         }))
@@ -180,7 +180,8 @@ function Admin() {
         })
 
         if (error) {
-          setAuthError('Invalid email or password')
+          console.error(error)
+          setAuthError(error.message)
           setLoading(false)
           return
         }
@@ -222,7 +223,8 @@ function Admin() {
         })
 
         if (error) {
-          setAuthError('Invalid email or password')
+          console.error(error)
+          setAuthError(error.message)
           setLoading(false)
           return
         }
@@ -551,33 +553,25 @@ function Admin() {
               </div>
 
               <form onSubmit={handleLogin}>
-                {loginType === 'admin' ? (
-                  <div className="mb-4">
-                    <label className="label" htmlFor="email">Email</label>
+                <div className="mb-4">
+                  <label className="label" htmlFor="email">Email</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
+                      </svg>
+                    </div>
                     <input
                       type="email"
                       id="email"
-                      className="input"
+                      className="input pl-10"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="Enter admin email"
+                      placeholder={loginType === 'admin' ? "admin@example.com" : "operator@example.com"}
                       required
                     />
                   </div>
-                ) : (
-                  <div className="mb-4">
-                    <label className="label" htmlFor="username">Username</label>
-                    <input
-                      type="text"
-                      id="username"
-                      className="input"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      placeholder="Enter operator username"
-                      required
-                    />
-                  </div>
-                )}
+                </div>
 
                 <div className="mb-4">
                   <label className="label" htmlFor="password">Password</label>

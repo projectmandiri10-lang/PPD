@@ -8,24 +8,34 @@ const corsHeaders = {
 }
 
 serve(async (req: Request) => {
-    // Handle CORS preflight requests
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders })
     }
 
     try {
-        // Create Supabase client with Service Role Key (for admin actions)
-        const supabase = createClient(
-            Deno.env.get('SUPABASE_URL') ?? '',
-            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-        )
+        const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
-        // Parse request body
-        const { action, data } = await req.json()
+        if (!supabaseKey) {
+            console.error('Missing SUPABASE_SERVICE_ROLE_KEY')
+            throw new Error('Server misconfiguration: Missing Service Key')
+        }
 
-        // 1. Verify Request: Check if caller is authenticated
+        const supabase = createClient(supabaseUrl, supabaseKey, {
+            auth: {
+                autoRefreshToken: false,
+                persistSession: false
+            }
+        })
+
+        const body = await req.json()
+        const { action, data } = body
+        console.log(`Action: ${action}`)
+
+        // 1. Verify Request
         const authHeader = req.headers.get('Authorization')
         if (!authHeader) {
+            console.error('Missing Auth Header')
             throw new Error('Missing Authorization header')
         }
 
@@ -33,18 +43,40 @@ serve(async (req: Request) => {
         const { data: { user }, error: userError } = await supabase.auth.getUser(token)
 
         if (userError || !user) {
+            console.error('Invalid token:', userError)
             throw new Error('Invalid token')
         }
 
-        // 2. Verify Role: Check if caller is an admin
-        const { data: userRole } = await supabase
+        console.log(`User ID: ${user.id}`)
+
+        // 2. Verify Role
+        const { data: roleData, error: roleError } = await supabase
             .from('user_roles')
             .select('role')
             .eq('user_id', user.id)
             .single()
 
-        if (userRole?.role !== 'admin') {
-            throw new Error('Unauthorized: Admin access required')
+        if (roleError) {
+            console.error('Role check failed:', roleError)
+        }
+
+        console.log(`User Role: ${roleData?.role}`)
+
+        if (roleData?.role !== 'admin') {
+            // DEBUG MODE: Return detail instead of throwing 401 directly
+            // This helps us see what the server sees.
+            return new Response(JSON.stringify({
+                error: 'Unauthorized: Admin access required',
+                debug: {
+                    user_id: user.id,
+                    email: user.email,
+                    role_found: roleData?.role || 'null',
+                    role_error: roleError ? roleError.message : 'none'
+                }
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 403, // Using 403 Forbidden instead of 401 to differentiate
+            })
         }
 
         // 3. Handle Actions
@@ -114,12 +146,14 @@ serve(async (req: Request) => {
 
             if (!user_id) throw new Error('User ID required')
 
-            // Delete from Auth
+            // Delete from Auth (Soft fail: if user not found, proceed to delete role)
             const { error: deleteError } = await supabase.auth.admin.deleteUser(user_id)
 
-            if (deleteError) throw deleteError
+            if (deleteError) {
+                console.warn(`Failed to delete auth user ${user_id} (might be already deleted):`, deleteError.message)
+            }
 
-            // Also ensure deleted from user_roles (redundancy if no cascade)
+            // Also ensure deleted from user_roles
             await supabase.from('user_roles').delete().eq('user_id', user_id)
 
             return new Response(JSON.stringify({ message: 'Operator deleted successfully' }), {
