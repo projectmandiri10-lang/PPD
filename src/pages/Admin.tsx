@@ -5,8 +5,6 @@ import type { ImageItem } from '../types'
 
 const ADMIN_TOKEN_KEY = 'admin_auth_token'
 const OPERATORS_STORAGE_KEY = 'app_operators'
-const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || ''
-const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || ''
 
 type TabType = 'list' | 'upload' | 'operators'
 type UserRole = 'admin' | 'operator' | null
