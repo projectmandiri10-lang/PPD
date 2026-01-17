@@ -35,7 +35,6 @@ function Admin() {
   // Form state
   const [title, setTitle] = useState('')
   const [slug, setSlug] = useState('')
-  const [downloadUrl, setDownloadUrl] = useState('')
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
 
@@ -220,14 +219,13 @@ function Admin() {
         slug: slug.trim(),
         thumbnailUrl,
         driveFileId,
-        downloadUrl: downloadUrl.trim(),
+        downloadUrl: '', // Always empty, using Google Drive link
       })
 
       if (createResult.error) throw new Error(createResult.error)
 
       setTitle('')
       setSlug('')
-      setDownloadUrl('')
       setImageFile(null)
       setImagePreview(null)
       setSuccess('Image uploaded successfully!')
@@ -242,7 +240,7 @@ function Admin() {
       setLoading(false)
       setUploadProgress('')
     }
-  }, [title, slug, downloadUrl, imageFile])
+  }, [title, slug, imageFile])
 
   const handleAddOperator = (e: React.FormEvent) => {
     e.preventDefault()
@@ -697,22 +695,6 @@ function Admin() {
                       required
                     />
                     <p className="text-xs text-gray-500 mt-1">URL: /#/p/{slug || 'your-slug'}</p>
-                  </div>
-
-                  <div className="mb-4">
-                    <label className="label" htmlFor="downloadUrl">
-                      Download URL <span className="text-gray-400 font-normal ml-1">(optional)</span>
-                    </label>
-                    <input
-                      type="url"
-                      id="downloadUrl"
-                      className="input"
-                      value={downloadUrl}
-                      onChange={(e) => setDownloadUrl(e.target.value)}
-                      placeholder="https://example.com/file.png"
-                      disabled={loading}
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Leave empty to use Google Drive link</p>
                   </div>
 
                   <div className="mb-6">

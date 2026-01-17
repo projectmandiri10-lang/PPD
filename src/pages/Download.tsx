@@ -30,19 +30,19 @@ function Download() {
 
       setLoading(true)
       setError(null)
-      
+
       const result = await fetchImageBySlug(slug)
-      
+
       if (result.error || !result.data) {
         setError(result.error || 'Image not found')
       } else {
         setItem(result.data)
         setDownloadUrl(getDownloadUrl(result.data))
       }
-      
+
       setLoading(false)
     }
-    
+
     loadItem()
   }, [slug, navigate])
 
@@ -56,7 +56,7 @@ function Download() {
     try {
       // Try to open download in new window
       const newWindow = window.open(downloadUrl, '_blank')
-      
+
       // If popup was blocked or failed, show manual link
       if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
         setRedirectFailed(true)
@@ -71,7 +71,7 @@ function Download() {
     if (item.thumbnailUrl && item.thumbnailUrl.trim()) {
       return item.thumbnailUrl
     }
-    return getDriveThumbnailUrl(item.driveFileId, 'medium')
+    return getDriveThumbnailUrl(item.driveFileId)
   }
 
   if (loading) {
@@ -89,17 +89,17 @@ function Download() {
     return (
       <div className="container-main py-20">
         <div className="max-w-md mx-auto text-center">
-          <svg 
-            className="w-16 h-16 text-gray-300 mx-auto mb-4" 
-            fill="none" 
-            stroke="currentColor" 
+          <svg
+            className="w-16 h-16 text-gray-300 mx-auto mb-4"
+            fill="none"
+            stroke="currentColor"
             viewBox="0 0 24 24"
           >
-            <path 
-              strokeLinecap="round" 
-              strokeLinejoin="round" 
-              strokeWidth={2} 
-              d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" 
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
             />
           </svg>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Download Not Found</h1>
@@ -177,9 +177,9 @@ function Download() {
                   <p className="text-gray-600 mb-4">
                     Please wait while we prepare your download...
                   </p>
-                  <Countdown 
-                    duration={COUNTDOWN_DURATION} 
-                    onComplete={handleCountdownComplete} 
+                  <Countdown
+                    duration={COUNTDOWN_DURATION}
+                    onComplete={handleCountdownComplete}
                   />
                 </>
               ) : (
@@ -189,17 +189,17 @@ function Download() {
                       onClick={handleDownload}
                       className="btn-success w-full sm:w-auto px-8 py-3 text-lg"
                     >
-                      <svg 
-                        className="w-6 h-6 mr-2" 
-                        fill="none" 
-                        stroke="currentColor" 
+                      <svg
+                        className="w-6 h-6 mr-2"
+                        fill="none"
+                        stroke="currentColor"
                         viewBox="0 0 24 24"
                       >
-                        <path 
-                          strokeLinecap="round" 
-                          strokeLinejoin="round" 
-                          strokeWidth={2} 
-                          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" 
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
                         />
                       </svg>
                       Continue Download
@@ -215,17 +215,17 @@ function Download() {
                         rel="noopener noreferrer"
                         className="btn-primary inline-flex"
                       >
-                        <svg 
-                          className="w-5 h-5 mr-2" 
-                          fill="none" 
-                          stroke="currentColor" 
+                        <svg
+                          className="w-5 h-5 mr-2"
+                          fill="none"
+                          stroke="currentColor"
                           viewBox="0 0 24 24"
                         >
-                          <path 
-                            strokeLinecap="round" 
-                            strokeLinejoin="round" 
-                            strokeWidth={2} 
-                            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" 
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
                           />
                         </svg>
                         Direct Download Link
@@ -238,7 +238,7 @@ function Download() {
 
             {/* Back Link */}
             <div className="text-center mt-6 pt-6 border-t border-gray-200">
-              <Link 
+              <Link
                 to={`/p/${item.slug}`}
                 className="text-primary-600 hover:text-primary-700 font-medium transition-colors"
               >

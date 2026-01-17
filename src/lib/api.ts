@@ -302,11 +302,8 @@ export function generateSlug(title: string): string {
     .substring(0, 100);
 }
 
-export function getDriveThumbnailUrl(driveFileId: string, size: 'small' | 'medium' | 'large' = 'medium'): string {
-  const sizeMap = {
-    small: 's220',
-    medium: 's400',
-    large: 's1000',
-  };
-  return `https://drive.google.com/thumbnail?id=${driveFileId}&sz=${sizeMap[size]}`;
+export function getDriveThumbnailUrl(driveFileId: string): string {
+  // Gunakan format uc?export=view yang lebih reliable di mobile
+  // Format ini tidak memerlukan cookies dan bekerja di semua device
+  return `https://drive.google.com/uc?export=view&id=${driveFileId}`;
 }
