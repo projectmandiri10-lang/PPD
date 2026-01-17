@@ -60,22 +60,38 @@ function Admin() {
   const [operatorError, setOperatorError] = useState<string | null>(null)
   const [operatorSuccess, setOperatorSuccess] = useState<string | null>(null)
 
-  // Load operators from localStorage
-  const loadOperators = () => {
+  // Load operators from Supabase
+  const loadOperators = async () => {
     try {
-      const stored = localStorage.getItem(OPERATORS_STORAGE_KEY)
-      if (stored) {
-        setOperators(JSON.parse(stored))
-      }
-    } catch {
-      console.error('Failed to load operators')
-    }
-  }
+      const { supabase } = await import('../lib/supabase')
+      const { data: { session } } = await supabase.auth.getSession()
 
-  // Save operators to localStorage
-  const saveOperators = (ops: Operator[]) => {
-    localStorage.setItem(OPERATORS_STORAGE_KEY, JSON.stringify(ops))
-    setOperators(ops)
+      if (!session) return
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/user-management`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ action: 'list_operators' })
+      })
+
+      const result = await response.json()
+
+      if (response.ok && result.data) {
+        // Map Supabase users to Operator interface
+        const ops: Operator[] = result.data.map((u: any) => ({
+          id: u.id,
+          username: u.email, // Map email to username for compatibility
+          password: '***', // Password not available
+          createdAt: u.created_at
+        }))
+        setOperators(ops)
+      }
+    } catch (err) {
+      console.error('Failed to load operators', err)
+    }
   }
 
   // Check existing auth on mount
@@ -197,21 +213,46 @@ function Admin() {
         setCurrentUser(data.user.email || '')
         setLoading(false)
       } else {
-        // Operator login (localStorage - temporary)
-        const stored = localStorage.getItem(OPERATORS_STORAGE_KEY)
-        if (stored) {
-          const ops: Operator[] = JSON.parse(stored)
-          const op = ops.find(o => o.username === username && o.password === password)
-          if (op) {
-            localStorage.setItem(ADMIN_TOKEN_KEY, `operator:${op.username}`)
-            setUserRole('operator')
-            setCurrentUser(op.username)
-          } else {
-            setAuthError('Invalid operator credentials')
-          }
-        } else {
-          setAuthError('No operators found')
+        // Operator login with Supabase Auth
+        const { supabase, getUserRole } = await import('../lib/supabase')
+
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password: password
+        })
+
+        if (error) {
+          setAuthError('Invalid email or password')
+          setLoading(false)
+          return
         }
+
+        if (!data.user) {
+          setAuthError('Login failed')
+          setLoading(false)
+          return
+        }
+
+        // Get user role from database
+        const { role, error: roleError } = await getUserRole()
+
+        if (roleError || !role) {
+          setAuthError('User not authorized. Please contact administrator.')
+          await supabase.auth.signOut()
+          setLoading(false)
+          return
+        }
+
+        if (role !== 'operator' && role !== 'admin') {
+          setAuthError('Invalid user role.')
+          await supabase.auth.signOut()
+          setLoading(false)
+          return
+        }
+
+        // Success - set operator role
+        setUserRole(role)
+        setCurrentUser(data.user.email || '')
         setLoading(false)
       }
     } catch (err) {
@@ -297,46 +338,114 @@ function Admin() {
     }
   }, [title, slug, imageFile])
 
-  const handleAddOperator = (e: React.FormEvent) => {
+  const handleAddOperator = async (e: React.FormEvent) => {
     e.preventDefault()
     setOperatorError(null)
     setOperatorSuccess(null)
+    setLoading(true)
 
-    if (!newOperatorUsername.trim()) {
-      setOperatorError('Username is required')
-      return
-    }
-    if (!newOperatorPassword.trim()) {
-      setOperatorError('Password is required')
-      return
-    }
-    if (newOperatorPassword.length < 4) {
-      setOperatorError('Password must be at least 4 characters')
-      return
-    }
+    try {
+      const email = newOperatorUsername.trim()
+      const password = newOperatorPassword
 
-    // Check duplicate username
-    if (operators.find(o => o.username.toLowerCase() === newOperatorUsername.toLowerCase())) {
-      setOperatorError('Username already exists')
-      return
-    }
+      if (!email) {
+        setOperatorError('Email is required')
+        setLoading(false)
+        return
+      }
+      if (!password) {
+        setOperatorError('Password is required')
+        setLoading(false)
+        return
+      }
+      if (password.length < 6) {
+        setOperatorError('Password must be at least 6 characters')
+        setLoading(false)
+        return
+      }
 
-    const newOp: Operator = {
-      id: Date.now().toString(),
-      username: newOperatorUsername.trim(),
-      password: newOperatorPassword,
-      createdAt: new Date().toISOString()
-    }
+      // Call Supabase Edge Function to create operator
+      const { supabase } = await import('../lib/supabase')
+      const { data: { session } } = await supabase.auth.getSession()
 
-    saveOperators([...operators, newOp])
-    setNewOperatorUsername('')
-    setNewOperatorPassword('')
-    setOperatorSuccess(`Operator "${newOp.username}" created successfully!`)
+      if (!session) {
+        setOperatorError('Not authenticated')
+        setLoading(false)
+        return
+      }
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/user-management`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          action: 'create_operator',
+          data: { email, password }
+        })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok || result.error) {
+        setOperatorError(result.error || 'Failed to create operator')
+        setLoading(false)
+        return
+      }
+
+      setNewOperatorUsername('')
+      setNewOperatorPassword('')
+      setOperatorSuccess(`Operator "${email}" created successfully!`)
+      setLoading(false)
+
+      // Reload operators list
+      loadOperators()
+    } catch (err) {
+      setOperatorError(err instanceof Error ? err.message : 'Failed to create operator')
+      setLoading(false)
+    }
   }
 
-  const handleDeleteOperator = (id: string) => {
-    if (confirm('Are you sure you want to delete this operator?')) {
-      saveOperators(operators.filter(o => o.id !== id))
+  const handleDeleteOperator = async (id: string, email: string) => {
+    if (!confirm(`Are you sure you want to delete operator "${email}"?`)) {
+      return
+    }
+
+    setLoading(true)
+    setOperatorError(null)
+    setOperatorSuccess(null)
+
+    try {
+      const { supabase } = await import('../lib/supabase')
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session) throw new Error('Not authenticated')
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/user-management`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          action: 'delete_operator',
+          data: { user_id: id }
+        })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok || result.error) {
+        throw new Error(result.error || 'Failed to delete operator')
+      }
+
+      setOperatorSuccess(`Operator "${email}" deleted successfully`)
+      loadOperators()
+    } catch (err) {
+      setOperatorError(err instanceof Error ? err.message : 'Failed to delete operator')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -806,14 +915,14 @@ function Admin() {
                 <h2 className="text-xl font-semibold text-gray-900 mb-6">Add New Operator</h2>
                 <form onSubmit={handleAddOperator}>
                   <div className="mb-4">
-                    <label className="label" htmlFor="newOpUsername">Username *</label>
+                    <label className="label" htmlFor="newOpEmail">Email *</label>
                     <input
-                      type="text"
-                      id="newOpUsername"
+                      type="email"
+                      id="newOpEmail"
                       className="input"
                       value={newOperatorUsername}
                       onChange={(e) => setNewOperatorUsername(e.target.value)}
-                      placeholder="Enter username"
+                      placeholder="operator@example.com"
                       required
                     />
                   </div>
@@ -825,7 +934,8 @@ function Admin() {
                       className="input"
                       value={newOperatorPassword}
                       onChange={(e) => setNewOperatorPassword(e.target.value)}
-                      placeholder="Enter password (min 4 chars)"
+                      placeholder="Enter password (min 6 chars)"
+                      minLength={6}
                       required
                     />
                   </div>
@@ -841,8 +951,8 @@ function Admin() {
                     </div>
                   )}
 
-                  <button type="submit" className="btn-primary w-full">
-                    Add Operator
+                  <button type="submit" className="btn-primary w-full" disabled={loading}>
+                    {loading ? 'Creating...' : 'Add Operator'}
                   </button>
                 </form>
 
@@ -878,7 +988,7 @@ function Admin() {
                           </p>
                         </div>
                         <button
-                          onClick={() => handleDeleteOperator(op.id)}
+                          onClick={() => handleDeleteOperator(op.id, op.username)}
                           className="text-red-600 hover:text-red-700 p-2"
                           title="Delete operator"
                         >
