@@ -1,196 +1,140 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from 'jsr:@supabase/supabase-js@2';
+
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-};
+}
 
-Deno.serve(async (req) => {
-    // Handle CORS preflight
+serve(async (req: Request) => {
+    // Handle CORS preflight requests
     if (req.method === 'OPTIONS') {
-        return new Response('ok', { headers: corsHeaders });
+        return new Response('ok', { headers: corsHeaders })
     }
 
     try {
-        // Create Supabase client with service role for admin operations
-        const supabaseAdmin = createClient(
+        // Create Supabase client with Service Role Key (for admin actions)
+        const supabase = createClient(
             Deno.env.get('SUPABASE_URL') ?? '',
-            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-            {
-                auth: {
-                    autoRefreshToken: false,
-                    persistSession: false
-                }
-            }
-        );
+            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+        )
 
-        // Create client with user's token for regular operations
-        const authHeader = req.headers.get('Authorization');
-        const supabaseClient = createClient(
-            Deno.env.get('SUPABASE_URL') ?? '',
-            Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-            {
-                global: {
-                    headers: authHeader ? { Authorization: authHeader } : {},
-                },
-            }
-        );
+        // Parse request body
+        const { action, data } = await req.json()
 
-        const { action, data } = await req.json();
-
-        // Get current user
-        const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-
-        if (userError || !user) {
-            return new Response(
-                JSON.stringify({ error: 'Unauthorized' }),
-                { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
-            );
+        // 1. Verify Request: Check if caller is authenticated
+        const authHeader = req.headers.get('Authorization')
+        if (!authHeader) {
+            throw new Error('Missing Authorization header')
         }
 
-        // Get user role
-        const { data: roleData, error: roleError } = await supabaseClient
+        const token = authHeader.replace('Bearer ', '')
+        const { data: { user }, error: userError } = await supabase.auth.getUser(token)
+
+        if (userError || !user) {
+            throw new Error('Invalid token')
+        }
+
+        // 2. Verify Role: Check if caller is an admin
+        const { data: userRole } = await supabase
             .from('user_roles')
             .select('role')
             .eq('user_id', user.id)
-            .single();
+            .single()
 
-        if (roleError || !roleData) {
-            return new Response(
-                JSON.stringify({ error: 'User role not found' }),
-                { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
-            );
+        if (userRole?.role !== 'admin') {
+            throw new Error('Unauthorized: Admin access required')
         }
 
-        const userRole = roleData.role;
+        // 3. Handle Actions
 
-        // Handle different actions
-        switch (action) {
-            case 'create_operator': {
-                // Only admins can create operators
-                if (userRole !== 'admin') {
-                    return new Response(
-                        JSON.stringify({ error: 'Only admins can create operators' }),
-                        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
-                    );
-                }
+        // ACTION: create_operator
+        // Creates a new user in Supabase Auth and adds to user_roles table
+        if (action === 'create_operator') {
+            const { email, password } = data
 
-                const { email, password } = data;
+            if (!email || !password) throw new Error('Email and password required')
 
-                // Create user with admin client
-                const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-                    email,
-                    password,
-                    email_confirm: true, // Auto-confirm email
-                });
+            // Create user in Auth
+            const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
+                email,
+                password,
+                email_confirm: true, // Auto confirm
+                user_metadata: { role: 'operator' }
+            })
 
-                if (createError) {
-                    return new Response(
-                        JSON.stringify({ error: createError.message }),
-                        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-                    );
-                }
+            if (createError) throw createError
 
-                // Insert role
-                const { error: roleInsertError } = await supabaseAdmin
-                    .from('user_roles')
-                    .insert({
-                        user_id: newUser.user.id,
-                        email: email,
-                        role: 'operator'
-                    });
+            // Add to user_roles table
+            const { error: roleError } = await supabase
+                .from('user_roles')
+                .insert({
+                    user_id: newUser.user.id,
+                    email: email,
+                    role: 'operator'
+                })
 
-                if (roleInsertError) {
-                    // Rollback: delete user if role insert fails
-                    await supabaseAdmin.auth.admin.deleteUser(newUser.user.id);
-                    return new Response(
-                        JSON.stringify({ error: roleInsertError.message }),
-                        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-                    );
-                }
-
-                return new Response(
-                    JSON.stringify({
-                        success: true,
-                        user: {
-                            id: newUser.user.id,
-                            email: newUser.user.email,
-                            role: 'operator'
-                        }
-                    }),
-                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-                );
+            if (roleError) {
+                // If role creation fails, try to cleanup the user (optional but good practice)
+                await supabase.auth.admin.deleteUser(newUser.user.id)
+                throw new Error('Failed to assign role: ' + roleError.message)
             }
 
-            case 'list_operators': {
-                // Only admins can list operators
-                if (userRole !== 'admin') {
-                    return new Response(
-                        JSON.stringify({ error: 'Only admins can list operators' }),
-                        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
-                    );
-                }
-
-                const { data: operators, error: listError } = await supabaseClient
-                    .from('user_roles')
-                    .select('id, email, role, created_at')
-                    .eq('role', 'operator')
-                    .order('created_at', { ascending: false });
-
-                if (listError) {
-                    return new Response(
-                        JSON.stringify({ error: listError.message }),
-                        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-                    );
-                }
-
-                return new Response(
-                    JSON.stringify({ operators }),
-                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-                );
-            }
-
-            case 'delete_operator': {
-                // Only admins can delete operators
-                if (userRole !== 'admin') {
-                    return new Response(
-                        JSON.stringify({ error: 'Only admins can delete operators' }),
-                        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
-                    );
-                }
-
-                const { userId } = data;
-
-                // Delete user (will cascade delete role due to ON DELETE CASCADE)
-                const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
-
-                if (deleteError) {
-                    return new Response(
-                        JSON.stringify({ error: deleteError.message }),
-                        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-                    );
-                }
-
-                return new Response(
-                    JSON.stringify({ success: true }),
-                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-                );
-            }
-
-            default:
-                return new Response(
-                    JSON.stringify({ error: 'Invalid action' }),
-                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-                );
+            return new Response(JSON.stringify({
+                message: 'Operator created successfully',
+                data: { id: newUser.user.id, email: newUser.user.email }
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 200,
+            })
         }
+
+        // ACTION: list_operators
+        // Lists all users with role 'operator' from user_roles table
+        if (action === 'list_operators') {
+            const { data: operators, error } = await supabase
+                .from('user_roles')
+                .select('*')
+                .eq('role', 'operator')
+                .order('created_at', { ascending: false })
+
+            if (error) throw error
+
+            return new Response(JSON.stringify({ data: operators }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 200,
+            })
+        }
+
+        // ACTION: delete_operator
+        // Deletes user from Auth (and cascades to user_roles if configured, or manual delete)
+        if (action === 'delete_operator') {
+            const { user_id } = data
+
+            if (!user_id) throw new Error('User ID required')
+
+            // Delete from Auth
+            const { error: deleteError } = await supabase.auth.admin.deleteUser(user_id)
+
+            if (deleteError) throw deleteError
+
+            // Also ensure deleted from user_roles (redundancy if no cascade)
+            await supabase.from('user_roles').delete().eq('user_id', user_id)
+
+            return new Response(JSON.stringify({ message: 'Operator deleted successfully' }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 200,
+            })
+        }
+
+        throw new Error(`Unknown action: ${action}`)
 
     } catch (error) {
-        console.error('Error:', error);
-        return new Response(
-            JSON.stringify({ error: error instanceof Error ? error.message : 'Internal server error' }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-        );
+        const message = error instanceof Error ? error.message : 'Unknown error'
+        return new Response(JSON.stringify({ error: message }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400,
+        })
     }
-});
+})

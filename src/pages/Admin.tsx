@@ -55,7 +55,7 @@ function Admin() {
 
   // Operator management state
   const [operators, setOperators] = useState<Operator[]>([])
-  const [newOperatorUsername, setNewOperatorUsername] = useState('')
+  const [newOperatorEmail, setNewOperatorEmail] = useState('')
   const [newOperatorPassword, setNewOperatorPassword] = useState('')
   const [operatorError, setOperatorError] = useState<string | null>(null)
   const [operatorSuccess, setOperatorSuccess] = useState<string | null>(null)
@@ -345,7 +345,7 @@ function Admin() {
     setLoading(true)
 
     try {
-      const email = newOperatorUsername.trim()
+      const email = newOperatorEmail.trim()
       const password = newOperatorPassword
 
       if (!email) {
@@ -394,7 +394,7 @@ function Admin() {
         return
       }
 
-      setNewOperatorUsername('')
+      setNewOperatorEmail('')
       setNewOperatorPassword('')
       setOperatorSuccess(`Operator "${email}" created successfully!`)
       setLoading(false)
@@ -920,8 +920,8 @@ function Admin() {
                       type="email"
                       id="newOpEmail"
                       className="input"
-                      value={newOperatorUsername}
-                      onChange={(e) => setNewOperatorUsername(e.target.value)}
+                      value={newOperatorEmail}
+                      onChange={(e) => setNewOperatorEmail(e.target.value)}
                       placeholder="operator@example.com"
                       required
                     />
