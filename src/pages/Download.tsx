@@ -3,8 +3,8 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { fetchImageBySlug, getDownloadUrl, getDriveThumbnailUrl } from '../lib/api'
 import Countdown from '../components/Countdown'
-import MonetagSocialBar from '../components/ads/MonetagSocialBar'
 import MonetagNativeBanner from '../components/ads/MonetagNativeBanner'
+import MonetagMultitag from '../components/ads/MonetagMultitag'
 import type { ImageItem } from '../types'
 
 const siteName = import.meta.env.VITE_SITE_NAME || 'Image Download Hub'
@@ -253,8 +253,8 @@ function Download() {
           <MonetagNativeBanner />
         </div>
 
-        {/* Social Bar Ad (fixed position) */}
-        <MonetagSocialBar />
+        {/* Social Bar / Multitag (fixed position) */}
+        <MonetagMultitag />
       </div>
     </>
   )

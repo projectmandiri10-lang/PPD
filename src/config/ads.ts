@@ -12,13 +12,11 @@
  * PENTING: Key di bawah adalah placeholder, harus diganti dengan key asli dari Monetag!
  */
 
-// Monetag Tag ID - Ganti dengan Tag ID dari Monetag dashboard
-export const MONETAG_TAG_ID = import.meta.env.VITE_MONETAG_TAG_ID || 'YOUR_MONETAG_TAG_ID';
+// Monetag Tag ID (Untuk Banner Native - Opsional, buat zona Native Banner terpisah jika ingin isi slot banner)
+export const MONETAG_TAG_ID = import.meta.env.VITE_MONETAG_TAG_ID || 'YOUR_NATIVE_BANNER_ID';
 
-// Monetag script source URL
+// Monetag Multitag Configuration (Sesuai instruksi baru Anda)
+export const MONETAG_MULTITAG_ZONE = import.meta.env.VITE_MONETAG_ZONE || '203020'; // ID dari script Anda
+export const MONETAG_MULTITAG_URL = import.meta.env.VITE_MONETAG_SCRIPT_URL || 'https://quge5.com/88/tag.min.js'; // URL dari script Anda
+
 export const MONETAG_SRC = `//cdn.monetag.com/tags/${MONETAG_TAG_ID}.js`;
-
-// Alternative script pattern (jika format berbeda)
-export const getMonetagScript = (tagId: string) => {
-  return `//cdn.monetag.com/tags/${tagId}.js`;
-};
