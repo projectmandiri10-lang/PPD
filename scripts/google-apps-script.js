@@ -71,6 +71,14 @@ function doPost(e) {
     }
 
     // Router
+    if (action === 'list') {
+      return createJsonResponse(handleListData());
+    }
+
+    if (action === 'get') {
+      return createJsonResponse(handleGetData(data));
+    }
+
     if (action === 'upload') {
       return createJsonResponse(handleUploadData(data));
     }
@@ -92,6 +100,37 @@ function doPost(e) {
 
   } catch (error) {
     return createJsonResponse({ error: error.message });
+  }
+}
+
+// ==================== HANDLER FUNCTIONS ====================
+
+function handleListData() {
+  try {
+    const items = getAllData();
+    return items;
+  } catch (error) {
+    return { error: 'Failed to fetch list: ' + error.message };
+  }
+}
+
+function handleGetData(data) {
+  try {
+    const slug = data.slug || data.data?.slug;
+    if (!slug) {
+      return { error: 'Slug is required' };
+    }
+
+    const items = getAllData();
+    const item = items.find(i => i.slug === slug);
+
+    if (!item) {
+      return { error: 'Image not found' };
+    }
+
+    return { data: item };
+  } catch (error) {
+    return { error: 'Failed to fetch image: ' + error.message };
   }
 }
 

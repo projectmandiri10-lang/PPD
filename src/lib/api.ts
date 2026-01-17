@@ -1,7 +1,6 @@
 import { ImageItem, ApiResponse, CacheItem, UploadResponse } from '../types';
 
 // API Endpoints
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 const PROXY_URL = `${SUPABASE_URL}/functions/v1/google-apps-proxy`;
 
@@ -57,49 +56,10 @@ export function clearCache(): void {
   }
 }
 
-// ==================== JSONP HELPER (untuk GET requests) ====================
-
-/**
- * JSONP request untuk mengatasi CORS pada GET requests ke Google Apps Script
- * Ini adalah satu-satunya cara yang benar untuk GET tanpa CORS error
- */
-function jsonpRequest<T>(url: string): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const callbackName = `jsonp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const script = document.createElement('script');
-    const timeout = setTimeout(() => {
-      cleanup();
-      reject(new Error('JSONP request timeout'));
-    }, 30000); // 30 second timeout
-
-    const cleanup = () => {
-      clearTimeout(timeout);
-      delete (window as any)[callbackName];
-      if (script.parentNode) {
-        script.parentNode.removeChild(script);
-      }
-    };
-
-    (window as any)[callbackName] = (data: T) => {
-      cleanup();
-      resolve(data);
-    };
-
-    script.onerror = () => {
-      cleanup();
-      reject(new Error('JSONP request failed'));
-    };
-
-    const separator = url.includes('?') ? '&' : '?';
-    script.src = `${url}${separator}callback=${callbackName}`;
-    document.head.appendChild(script);
-  });
-}
-
 // ==================== API FUNCTIONS ====================
 
 /**
- * Fetch semua gambar menggunakan JSONP (GET request, no CORS issue)
+ * Fetch semua gambar menggunakan Supabase proxy
  */
 export async function fetchImageList(): Promise<ApiResponse<ImageItem[]>> {
   const cached = getFromCache<ImageItem[]>(CACHE_KEY_LIST);
@@ -108,7 +68,27 @@ export async function fetchImageList(): Promise<ApiResponse<ImageItem[]>> {
   }
 
   try {
-    const data = await jsonpRequest<ImageItem[]>(`${API_BASE_URL}?path=list`);
+    const response = await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'list',
+        data: {}
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch images: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data.error) {
+      throw new Error(data.error);
+    }
+
     const items: ImageItem[] = Array.isArray(data) ? data : [];
 
     saveToCache(CACHE_KEY_LIST, items);
@@ -120,7 +100,7 @@ export async function fetchImageList(): Promise<ApiResponse<ImageItem[]>> {
 }
 
 /**
- * Fetch gambar by slug menggunakan JSONP
+ * Fetch gambar by slug menggunakan Supabase proxy
  */
 export async function fetchImageBySlug(slug: string): Promise<ApiResponse<ImageItem>> {
   const cacheKey = `${CACHE_KEY_PREFIX}${slug}`;
@@ -139,8 +119,28 @@ export async function fetchImageBySlug(slug: string): Promise<ApiResponse<ImageI
   }
 
   try {
-    const response = await jsonpRequest<{ data: ImageItem }>(`${API_BASE_URL}?slug=${encodeURIComponent(slug)}`);
-    const item: ImageItem = response.data;
+    const response = await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'get',
+        data: { slug }
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image: ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    if (result.error) {
+      throw new Error(result.error);
+    }
+
+    const item: ImageItem = result.data;
 
     saveToCache(cacheKey, item);
     return { data: item, error: null };
