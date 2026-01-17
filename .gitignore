@@ -29,9 +29,9 @@ Thumbs.db
 # Local Netlify folder
 .netlify
 
-# Documentation (keep local only, synced with Google Drive)
-*.md
-!node_modules/**/*.md
+# Documentation (Internal Strategy)
+APP_STRATEGY.md
+MONETAG_GUIDE.md
 
 # Google Apps Script (contains sensitive IDs)
 scripts/google-apps-script.js
