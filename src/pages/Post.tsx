@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { fetchImageBySlug, getDriveThumbnailUrl } from '../lib/api'
+import MonetagSocialBar from '../components/ads/MonetagSocialBar'
+import MonetagNativeBanner from '../components/ads/MonetagNativeBanner'
 import type { ImageItem } from '../types'
 
 const siteName = import.meta.env.VITE_SITE_NAME || 'Image Download Hub'
@@ -287,8 +289,16 @@ function Post() {
                 </div>
               </div>
             </div>
+
+            {/* Ad - Below Sidebar using Monetag Native Banner */}
+            <div className="mt-6">
+              <MonetagNativeBanner />
+            </div>
           </div>
         </div>
+
+        {/* Ad - Social Bar (Fixed) */}
+        <MonetagSocialBar />
       </div>
     </>
   )
