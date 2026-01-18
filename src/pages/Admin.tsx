@@ -37,7 +37,7 @@ function Admin() {
   const [sourceFile, setSourceFile] = useState<File | null>(null)
   const [fileType, setFileType] = useState<string>('jpg')
   const [description, setDescription] = useState('')
-  const [generatingDesc, setGeneratingDesc] = useState(false)
+  // const [generatingDesc, setGeneratingDesc] = useState(false) // Disabled AI generation
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false)
 
   // UI state
@@ -188,6 +188,8 @@ function Admin() {
   }, [])
 
   // Auto-generate description with Gemini AI when image is selected
+  // DISABLED: API Key issue - users can input description manually
+  /*
   useEffect(() => {
     const generateDesc = async () => {
       if (!imageFile) return
@@ -206,6 +208,7 @@ function Admin() {
 
     generateDesc()
   }, [imageFile])
+  */
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
@@ -928,21 +931,13 @@ function Admin() {
                   <div className="mb-6">
                     <label className="label flex justify-between items-center">
                       <span>Description (SEO & Pinterest) - Optional</span>
-                      {generatingDesc && (
-                        <span className="text-xs text-purple-600 flex items-center animate-pulse">
-                          <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                          </svg>
-                          Generating with AI...
-                        </span>
-                      )}
                     </label>
                     <textarea
                       className="input h-32 text-sm"
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Enter description manually or generate with AI..."
-                      disabled={loading || generatingDesc}
+                      placeholder="Enter description for Pinterest and SEO..."
+                      disabled={loading}
                     ></textarea>
                     <p className="text-xs text-gray-500 mt-1">This text will be used for Pinterest description and SEO.</p>
                   </div>
