@@ -77,71 +77,81 @@
   <!-- Monetag Scripts (Body End for Verification) -->
   <script src="https://nap5k.com/tag.min.js" data-zone="10479089"></script>
 
-  <!-- HILLTOPADS SCRIPTS (Paste Here) -->
-  <!-- Filter Dashboard HilltopAds adalah pertahanan utama -->
-  <!-- <script> ... </script> -->
+  <!-- HILLTOPADS SCRIPT (In-Page Push) -->
+  <script>
+    (function (crza) {
+      var d = document,
+        s = d.createElement('script'),
+        l = d.scripts[d.scripts.length - 1];
+      s.settings = crza || {};
+      s.src = "\/\/quixoticwar.com\/bZXDVEs.dxG\/lK0qYJWQcJ\/NeJmg9munZcUslSkNPCTyYC3\/NfToAw2aMFzAQTtZNZjUcz1sMqDPY\/zqNQQV";
+      s.async = true;
+      s.referrerPolicy = 'no-referrer-when-downgrade';
+      l.parentNode.insertBefore(s, l);
+    })({})
+  </script>
 
 
   <!-- SAFETY FILTER SCRIPT -->
   <!-- Script ini mencoba menyensor iklan dengan kata kunci sensitif yang bocor ke DOM -->
   <script>
-    (function () {
-      const BAD_WORDS = [
-        // Judi / Gambling
-        'casino', 'slot ', ' slots', 'gacor', 'jackpot', 'zeus', 'pragmatic', 'bet88', 'bet77', 'togel', ' depo ', 'withdraw',
-        // Pinjaman / Loans
-        'pinjaman', 'kredit', 'bunga rendah', 'cair cepat', 'dana tunai', 'pinjol',
-        // Dewasa / Adult
-        'sex', 'porn', '18+', 'dating', 'kencan', 'tante', 'hot girls', 'video panas', 'memek', 'bokep', 'telanjang'
-      ];
+      (function () {
+        const BAD_WORDS = [
+          // Judi / Gambling
+          'casino', 'slot ', ' slots', 'gacor', 'jackpot', 'zeus', 'pragmatic', 'bet88', 'bet77', 'togel', ' depo ', 'withdraw',
+          // Pinjaman / Loans
+          'pinjaman', 'kredit', 'bunga rendah', 'cair cepat', 'dana tunai', 'pinjol',
+          // Dewasa / Adult
+          'sex', 'porn', '18+', 'dating', 'kencan', 'tante', 'hot girls', 'video panas', 'memek', 'bokep', 'telanjang'
+        ];
 
-      function checkAndRemove(node) {
-        // Hanya cek elemen HTML (bukan text node murni yang tidak visible)
-        if (node.nodeType === 1) {
-          try {
-            const text = (node.innerText || '').toLowerCase();
-            const html = (node.innerHTML || '').toLowerCase(); // Cek link juga
+        function checkAndRemove(node) {
+          // Hanya cek elemen HTML (bukan text node murni yang tidak visible)
+          if (node.nodeType === 1) {
+            try {
+              const text = (node.innerText || '').toLowerCase();
+              const html = (node.innerHTML || '').toLowerCase(); // Cek link juga
 
-            // Cek jika teks mengandung bad words
-            const isBad = BAD_WORDS.some(word => text.includes(word) || html.includes(word));
+              // Cek jika teks mengandung bad words
+              const isBad = BAD_WORDS.some(word => text.includes(word) || html.includes(word));
 
-            if (isBad) {
-              console.log('Safety Filter: Blocked potentially unsafe content containing restricted keywords.');
-              // Opsi 1: Hapus node (Extreme) - Bisa merusak layout
-              // node.remove(); 
+              if (isBad) {
+                console.log('Safety Filter: Blocked potentially unsafe content containing restricted keywords.');
+                // Opsi 1: Hapus node (Extreme) - Bisa merusak layout
+                // node.remove(); 
 
-              // Opsi 2: Sembunyikan (Safer)
-              node.style.display = 'none';
-              node.style.visibility = 'hidden';
-              node.setAttribute('data-blocked', 'true');
+                // Opsi 2: Sembunyikan (Safer)
+                node.style.display = 'none';
+                node.style.visibility = 'hidden';
+                node.setAttribute('data-blocked', 'true');
+              }
+            } catch (e) {
+              // Ignore error cross-origin access
             }
-          } catch (e) {
-            // Ignore error cross-origin access
           }
         }
-      }
 
-      // Observer untuk memantau perubahan DOM (iklan baru muncul)
-      const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-          mutation.addedNodes.forEach((node) => {
-            checkAndRemove(node);
-            // Juga cek children jika node adalah container
-            if (node.querySelectorAll) {
-              // Jika node punya children, kita perlu cek deep, tapi ini berat.
-              // Kita asumsikan iklan monetag biasanya container kecil.
-              // Cek jika container itu sendiri mengandung teks buruk
-            }
+        // Observer untuk memantau perubahan DOM (iklan baru muncul)
+        const observer = new MutationObserver((mutations) => {
+          mutations.forEach((mutation) => {
+            mutation.addedNodes.forEach((node) => {
+              checkAndRemove(node);
+              // Juga cek children jika node adalah container
+              if (node.querySelectorAll) {
+                // Jika node punya children, kita perlu cek deep, tapi ini berat.
+                // Kita asumsikan iklan monetag biasanya container kecil.
+                // Cek jika container itu sendiri mengandung teks buruk
+              }
+            });
           });
         });
-      });
 
-      // Mulai memantau body
-      observer.observe(document.body, {
-        childList: true,
-        subtree: true
-      });
-    })();
+        // Mulai memantau body
+        observer.observe(document.body, {
+          childList: true,
+          subtree: true
+        });
+      })();
   </script>
 </body>
 
