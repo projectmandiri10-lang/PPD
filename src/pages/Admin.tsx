@@ -101,10 +101,17 @@ function Admin() {
     if (result.error) {
       setListError(result.error)
     } else if (result.data) {
-      setImages(result.data.reverse())
+      let filteredImages = result.data.reverse()
+
+      // Filter images for operators - they only see their own uploads
+      if (userRole === 'operator' && currentUser) {
+        filteredImages = filteredImages.filter(img => img.uploadedBy === currentUser)
+      }
+
+      setImages(filteredImages)
     }
     setListLoading(false)
-  }, [])
+  }, [userRole, currentUser])
 
   const loadOperators = useCallback(async () => {
     try {
@@ -419,7 +426,7 @@ function Admin() {
   }
 
   const handleDeleteImage = async (image: ImageItem) => {
-    if (!confirm(`Are you sure you want to delete "${image.title}"?\n\nThis will remove the entry from the database but will NOT delete the file from Google Drive.`)) {
+    if (!confirm(`Are you sure you want to delete "${image.title}"?\n\nThis will permanently delete the file from Google Drive and the database.`)) {
       return;
     }
 
