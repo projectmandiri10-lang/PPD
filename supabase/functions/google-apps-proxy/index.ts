@@ -13,7 +13,7 @@ const corsHeaders = {
     'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
 };
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
     // 1. Handle CORS preflight request explicitly
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders });
