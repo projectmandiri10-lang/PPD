@@ -9,8 +9,8 @@ export async function generateImageDescription(file: File): Promise<string> {
     }
 
     try {
-        // Use latest stable Gemini 1.5 Flash model
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+        // Use Gemini 1.5 Flash - stable, fast, and free tier compatible
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
         // Convert file to base64
         const base64Data = await fileToGenerativePart(file);
