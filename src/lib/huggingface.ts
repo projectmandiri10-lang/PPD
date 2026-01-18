@@ -1,16 +1,12 @@
 /**
  * Hugging Face Image Description Generator
- * Uses BLIP-2 model for image captioning
+ * Uses BLIP-2 model for image captioning via Supabase Edge Function proxy
  */
 
-const HF_TOKEN = import.meta.env.VITE_HUGGINGFACE_TOKEN || "";
-const HF_API_URL = "https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-large";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "";
+const HF_PROXY_URL = `${SUPABASE_URL}/functions/v1/huggingface-proxy`;
 
 export async function generateImageDescription(file: File): Promise<string> {
-    if (!HF_TOKEN) {
-        throw new Error("Hugging Face token is missing");
-    }
-
     try {
         // Convert file to blob
         const imageBlob = await file.arrayBuffer();
@@ -23,11 +19,10 @@ export async function generateImageDescription(file: File): Promise<string> {
             try {
                 console.log(`Hugging Face API attempt ${i + 1}...`);
 
-                // Call Hugging Face API
-                const response = await fetch(HF_API_URL, {
+                // Call Hugging Face via Supabase proxy
+                const response = await fetch(HF_PROXY_URL, {
                     method: "POST",
                     headers: {
-                        "Authorization": `Bearer ${HF_TOKEN}`,
                         "Content-Type": "application/octet-stream",
                     },
                     body: imageBlob,
