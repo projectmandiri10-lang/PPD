@@ -1,5 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
+// Fix for VS Code linter "Cannot find name Deno"
+declare const Deno: any;
+
 /**
  * Supabase Edge Function: Google Apps Script CORS Proxy
  * 
