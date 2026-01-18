@@ -37,6 +37,7 @@ function Admin() {
   const [fileType, setFileType] = useState<string>('jpg')
   const [description, setDescription] = useState('')
   const [generatingDesc, setGeneratingDesc] = useState(false)
+  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false)
 
   // UI state
   const [loading, setLoading] = useState(false)
@@ -87,10 +88,10 @@ function Admin() {
 
   // Auto-generate slug
   useEffect(() => {
-    if (title && !slug) {
+    if (title && !slugManuallyEdited) {
       setSlug(generateSlug(title))
     }
-  }, [title]) // Removed slug dependency to allow manual diff
+  }, [title, slugManuallyEdited])
 
   const loadImages = useCallback(async () => {
     setListLoading(true)
@@ -812,8 +813,11 @@ function Admin() {
                       id="slug"
                       className="input"
                       value={slug}
-                      onChange={(e) => setSlug(e.target.value)}
-                      placeholder="url-friendly-slug"
+                      onChange={(e) => {
+                        setSlug(e.target.value)
+                        setSlugManuallyEdited(true)
+                      }}
+                      placeholder="auto-generated-slug"
                       disabled={loading}
                       required
                     />
