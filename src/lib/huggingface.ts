@@ -15,34 +15,63 @@ export async function generateImageDescription(file: File): Promise<string> {
         // Convert file to blob
         const imageBlob = await file.arrayBuffer();
 
-        // Call Hugging Face API
-        const response = await fetch(HF_API_URL, {
-            method: "POST",
-            headers: {
-                "Authorization": `Bearer ${HF_TOKEN}`,
-                "Content-Type": "application/octet-stream",
-            },
-            body: imageBlob,
-        });
+        // Retry logic for model loading
+        let retries = 3;
+        let lastError = null;
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`HF API Error: ${response.status} - ${errorText}`);
+        for (let i = 0; i < retries; i++) {
+            try {
+                console.log(`Hugging Face API attempt ${i + 1}...`);
+
+                // Call Hugging Face API
+                const response = await fetch(HF_API_URL, {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Bearer ${HF_TOKEN}`,
+                        "Content-Type": "application/octet-stream",
+                    },
+                    body: imageBlob,
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+
+                    // Check if model is loading
+                    if (response.status === 503 && errorText.includes("loading")) {
+                        console.log("Model is loading, waiting 10 seconds...");
+                        await new Promise(resolve => setTimeout(resolve, 10000));
+                        continue; // Retry
+                    }
+
+                    throw new Error(`HF API Error: ${response.status} - ${errorText}`);
+                }
+
+                const result = await response.json();
+                console.log("Hugging Face response:", result);
+
+                // BLIP returns array with generated_text
+                const caption = result[0]?.generated_text || "";
+
+                if (!caption) {
+                    throw new Error("No caption generated");
+                }
+
+                // Enhance the caption with Pinterest-friendly format
+                const enhancedDescription = enhanceForPinterest(caption);
+
+                return enhancedDescription;
+            } catch (error) {
+                lastError = error;
+                console.error(`Attempt ${i + 1} failed:`, error);
+
+                // Wait before retry (except last attempt)
+                if (i < retries - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                }
+            }
         }
 
-        const result = await response.json();
-
-        // BLIP returns array with generated_text
-        const caption = result[0]?.generated_text || "";
-
-        if (!caption) {
-            throw new Error("No caption generated");
-        }
-
-        // Enhance the caption with Pinterest-friendly format
-        const enhancedDescription = enhanceForPinterest(caption);
-
-        return enhancedDescription;
+        throw lastError;
     } catch (error) {
         console.error("Hugging Face Error:", error);
         throw new Error("Failed to generate description with AI");
