@@ -12,6 +12,7 @@
  * PENTING: Key di bawah adalah placeholder, harus diganti dengan key asli dari Monetag!
  */
 
-// Monetag Configuration
-// NOTE: Script In-Page Push (Banner) di-inject langsung di public/index.html
-// Zona ID: 10479089 (In-Page Push)
+// Ad Network Configuration
+// NOTE: Iklan aktif sekarang adalah HILLTOPADS (In-Page Push & Multitag)
+// Script di-inject langsung di public/index.html (bagian bawah body)
+// Monetag sudah dihapus untuk kebersihan konten.
