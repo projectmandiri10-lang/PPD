@@ -201,7 +201,7 @@ function Admin() {
 
       setGeneratingDesc(true)
       try {
-        const { generateImageDescription } = await import('../lib/huggingface')
+        const { generateImageDescription } = await import('../lib/gemini')
         const result = await generateImageDescription(imageFile)
         setDescription(result)
       } catch (err) {
