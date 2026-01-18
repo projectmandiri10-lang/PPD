@@ -9,20 +9,35 @@ export async function generateImageDescription(file: File): Promise<string> {
     }
 
     try {
-        // Use Gemini Pro Vision - stable and widely available
-        const model = genAI.getGenerativeModel({ model: "gemini-pro-vision" });
+        // Use Gemini 3 Flash Preview (confirmed available in logs)
+        const modelName = "gemini-3-flash-preview";
+        console.log(`Attempting to use model: ${modelName}`);
+
+        const model = genAI.getGenerativeModel({ model: modelName });
 
         // Convert file to base64
         const base64Data = await fileToGenerativePart(file);
 
-        const prompt = "Describe this image for Pinterest SEO in English. Focus on visual details, style, and potential use cases. Include 3-5 relevant hashtags. Keep it engaging but under 100 words. End with a Call to Action to download.";
+        const prompt = "Describe this image for Pinterest SEO in English. Focus on visual details, style, and potential use cases. Keep it engaging but under 100 words. Add a Call to Action: 'Visit our website for more!'. Place 3-5 relevant hashtags at the very end.";
 
         const result = await model.generateContent([prompt, base64Data]);
         const response = await result.response;
         return response.text();
     } catch (error) {
         console.error("Gemini Error:", error);
-        throw new Error("Failed to generate description with AI");
+
+        // Fallback: Gemini 2.0 Flash (also confirmed available)
+        try {
+            console.log("Retrying with fallback gemini-2.0-flash...");
+            const fallbackModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+            const base64Data = await fileToGenerativePart(file);
+            const prompt = "Describe this image for Pinterest SEO in English. Focus on visual details, style, and potential use cases. Keep it engaging but under 100 words. Add a Call to Action: 'Visit our website for more!'. Place 3-5 relevant hashtags at the very end.";
+            const result = await fallbackModel.generateContent([prompt, base64Data]);
+            return result.response.text();
+        } catch (fallbackError) {
+            console.error("Fallback Gemini Error:", fallbackError);
+            throw new Error("Failed to generate description with AI.");
+        }
     }
 }
 

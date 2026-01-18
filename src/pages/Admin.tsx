@@ -259,6 +259,13 @@ function Admin() {
 
       // 3. Save Metadata
       setUploadProgress('Saving metadata to database...')
+      console.log('Submitting data:', {
+        title: title.trim(),
+        slug: slug.trim(),
+        description: description, // Check if this has value
+        fileType
+      });
+
       const createResult = await createImageEntry({
         title: title.trim(),
         slug: slug.trim(),
@@ -293,7 +300,7 @@ function Admin() {
       setLoading(false)
       setUploadProgress('')
     }
-  }, [title, slug, imageFile, sourceFile, fileType, currentUser])
+  }, [title, slug, imageFile, sourceFile, fileType, currentUser, description])
 
   const handleAddOperator = async (e: React.FormEvent) => {
     e.preventDefault()
