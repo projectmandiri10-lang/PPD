@@ -161,9 +161,22 @@ function Download() {
             </div>
 
             {/* Title */}
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 text-center mb-6">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 text-center mb-2">
               {item.title}
             </h1>
+
+            {/* File Info Badge */}
+            {item.fileType && item.fileType !== 'jpg' && (
+              <div className="flex justify-center mb-6">
+                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${item.fileType === 'pdf' ? 'bg-red-100 text-red-800' :
+                    item.fileType === 'vector' ? 'bg-orange-100 text-orange-800' :
+                      item.fileType === 'zip' ? 'bg-gray-100 text-gray-800' :
+                        'bg-blue-100 text-blue-800'
+                  }`}>
+                  Format: {item.fileType.toUpperCase()}
+                </span>
+              </div>
+            )}
 
             {/* Countdown / Download Section */}
             <div className="text-center">

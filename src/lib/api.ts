@@ -158,6 +158,9 @@ export function getDownloadUrl(item: ImageItem): string {
   if (item.downloadUrl && item.downloadUrl.trim()) {
     return item.downloadUrl;
   }
+  if (item.sourceFileId && item.sourceFileId.trim()) {
+    return generateDownloadUrl(item.sourceFileId);
+  }
   return generateDownloadUrl(item.driveFileId);
 }
 

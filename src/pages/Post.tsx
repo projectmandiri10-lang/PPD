@@ -193,19 +193,37 @@ function Post() {
           {/* Info & Actions */}
           <div className="lg:col-span-1">
             <div className="card p-6 sticky top-24">
+              {/* File Type Badge */}
+              {item.fileType && item.fileType !== 'jpg' && (
+                <div className="mb-2">
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${item.fileType === 'pdf' ? 'bg-red-100 text-red-800' :
+                      item.fileType === 'vector' ? 'bg-orange-100 text-orange-800' :
+                        item.fileType === 'zip' ? 'bg-gray-100 text-gray-800' :
+                          'bg-blue-100 text-blue-800'
+                    }`}>
+                    {item.fileType.toUpperCase()}
+                  </span>
+                </div>
+              )}
+
               <h1 className="text-2xl font-bold text-gray-900 mb-4">
                 {item.title}
               </h1>
 
-              {item.createdAt && (
-                <p className="text-sm text-gray-500 mb-6">
-                  Added: {new Date(item.createdAt).toLocaleDateString('id-ID', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  })}
-                </p>
-              )}
+              <div className="text-sm text-gray-500 mb-6 space-y-1">
+                {item.createdAt && (
+                  <p>
+                    Added: {new Date(item.createdAt).toLocaleDateString('id-ID', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </p>
+                )}
+                {item.fileType && item.fileType !== 'jpg' && (
+                  <p>Format: <strong>{item.fileType.toUpperCase()}</strong></p>
+                )}
+              </div>
 
               {/* Download Button */}
               <Link

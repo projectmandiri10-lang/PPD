@@ -4,9 +4,11 @@ export interface ImageItem {
   slug: string;
   thumbnailUrl: string;
   driveFileId: string;
-  downloadUrl: string;
+  downloadUrl?: string;
+  uploadedBy?: string; // Email of uploader
+  sourceFileId?: string; // ID of the actual file (PDF/Vector) separate from preview
+  fileType?: string; // 'jpg', 'png', 'pdf', 'ai', 'eps', etc.
   createdAt: string;
-  uploadedBy?: string; // Track who uploaded the image
 }
 
 export interface ApiResponse<T> {
@@ -29,4 +31,6 @@ export interface AdminFormData {
   slug: string;
   downloadUrl: string;
   imageFile: File | null;
+  sourceFile: File | null;
+  fileType: string;
 }

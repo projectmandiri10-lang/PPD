@@ -35,6 +35,8 @@ function Admin() {
   const [slug, setSlug] = useState('')
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [sourceFile, setSourceFile] = useState<File | null>(null)
+  const [fileType, setFileType] = useState<string>('jpg')
 
   // UI state
   const [loading, setLoading] = useState(false)
@@ -312,34 +314,61 @@ function Admin() {
     try {
       if (!title.trim()) throw new Error('Title is required')
       if (!slug.trim()) throw new Error('Slug is required')
-      if (!imageFile) throw new Error('Image file is required')
+      if (!imageFile) throw new Error('Preview Image (JPG/PNG) is required')
 
-      setUploadProgress('Uploading image to Google Drive...')
-      const uploadResult = await uploadImage(imageFile)
-
-      if (uploadResult.error || !uploadResult.data) {
-        throw new Error(uploadResult.error || 'Failed to upload image')
+      // Validation: Source File is required for non-JPG formats
+      if (fileType !== 'jpg' && !sourceFile) {
+        throw new Error(`Source File is required for ${fileType.toUpperCase()} format`)
       }
 
-      const { driveFileId, thumbnailUrl } = uploadResult.data
+      // 1. Upload Preview Image
+      setUploadProgress('Uploading Preview Image...')
+      const uploadPreviewResult = await uploadImage(imageFile)
 
+      if (uploadPreviewResult.error || !uploadPreviewResult.data) {
+        throw new Error(uploadPreviewResult.error || 'Failed to upload preview image')
+      }
+
+      const { driveFileId: previewFileId, thumbnailUrl } = uploadPreviewResult.data
+      let sourceFileId = ''
+      let finalDownloadUrl = `https://drive.google.com/uc?id=${previewFileId}&export=download`
+
+      // 2. Upload Source File (If applicable)
+      if (fileType !== 'jpg' && sourceFile) {
+        setUploadProgress(`Uploading ${fileType.toUpperCase()} File...`)
+        const uploadSourceResult = await uploadImage(sourceFile)
+
+        if (uploadSourceResult.error || !uploadSourceResult.data) {
+          throw new Error(uploadSourceResult.error || 'Failed to upload source file')
+        }
+
+        sourceFileId = uploadSourceResult.data.driveFileId
+        finalDownloadUrl = `https://drive.google.com/uc?id=${sourceFileId}&export=download`
+      }
+
+      // 3. Save Metadata
       setUploadProgress('Saving metadata to database...')
       const createResult = await createImageEntry({
         title: title.trim(),
         slug: slug.trim(),
         thumbnailUrl,
-        driveFileId,
-        downloadUrl: `https://drive.google.com/uc?id=${driveFileId}&export=download`, // Auto-generate download URL
-        uploadedBy: currentUser
+        driveFileId: previewFileId,
+        downloadUrl: finalDownloadUrl,
+        uploadedBy: currentUser,
+        sourceFileId: sourceFileId,
+        fileType: fileType
       })
 
       if (createResult.error) throw new Error(createResult.error)
 
+      // Reset Form
       setTitle('')
       setSlug('')
       setImageFile(null)
       setImagePreview(null)
-      setSuccess('Image uploaded successfully!')
+      setSourceFile(null)
+      setFileType('jpg')
+      setSuccess('Content uploaded successfully!')
 
       clearCache()
       loadImages()
@@ -351,7 +380,7 @@ function Admin() {
       setLoading(false)
       setUploadProgress('')
     }
-  }, [title, slug, imageFile, currentUser])
+  }, [title, slug, imageFile, sourceFile, fileType, currentUser])
 
   const handleAddOperator = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -568,22 +597,15 @@ function Admin() {
               <form onSubmit={handleLogin}>
                 <div className="mb-4">
                   <label className="label" htmlFor="email">Email</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
-                      </svg>
-                    </div>
-                    <input
-                      type="email"
-                      id="email"
-                      className="input pl-10"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder={loginType === 'admin' ? "admin@example.com" : "operator@example.com"}
-                      required
-                    />
-                  </div>
+                  <input
+                    type="email"
+                    id="email"
+                    className="input"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder={loginType === 'admin' ? "admin@example.com" : "operator@example.com"}
+                    required
+                  />
                 </div>
 
                 <div className="mb-4">
@@ -895,8 +917,33 @@ function Admin() {
                     <p className="text-xs text-gray-500 mt-1">URL: /#/p/{slug || 'your-slug'}</p>
                   </div>
 
+                  <div className="mb-4">
+                    <label className="label">File Type</label>
+                    <select
+                      value={fileType}
+                      onChange={(e) => {
+                        const newType = e.target.value;
+                        setFileType(newType);
+                        if (newType === 'jpg') setSourceFile(null);
+                      }}
+                      className="input"
+                    >
+                      <option value="jpg">Image (JPG/PNG)</option>
+                      <option value="pdf">PDF Document</option>
+                      <option value="vector">Vector (AI/EPS/SVG)</option>
+                      <option value="zip">Archive (ZIP/RAR)</option>
+                    </select>
+                  </div>
+
                   <div className="mb-6">
-                    <label className="label">Image File *</label>
+                    <label className="label">
+                      {fileType === 'jpg' ? 'Image File (JPG/PNG/WebP) *' : 'Preview Cover (JPG/PNG/WebP) *'}
+                    </label>
+                    <p className="text-xs text-gray-500 mb-2">
+                      {fileType === 'jpg'
+                        ? 'This image will be shown on the website and downloaded by users.'
+                        : 'This image will be shown as a preview/thumbnail on the website.'}
+                    </p>
                     <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-primary-500 transition-colors">
                       {imagePreview ? (
                         <div className="space-y-4">
@@ -908,21 +955,67 @@ function Admin() {
                             className="text-red-600 text-sm hover:text-red-700"
                             disabled={loading}
                           >
-                            Remove
+                            Remove Preview
                           </button>
                         </div>
                       ) : (
-                        <label className="cursor-pointer">
+                        <label className="cursor-pointer block">
                           <svg className="w-12 h-12 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                           </svg>
-                          <p className="text-gray-600 mb-2">Click to upload</p>
-                          <p className="text-sm text-gray-400">PNG, JPG, GIF, WebP</p>
+                          <p className="text-gray-600 mb-2">
+                            {fileType === 'jpg' ? 'Upload Image' : 'Upload Cover Image'}
+                          </p>
+                          <p className="text-sm text-gray-400">JPG, PNG, WebP only</p>
                           <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} disabled={loading} />
                         </label>
                       )}
                     </div>
                   </div>
+
+                  {fileType !== 'jpg' && (
+                    <div className="mb-6">
+                      <label className="label">Source File ({fileType.toUpperCase()}) *</label>
+                      <p className="text-xs text-gray-500 mb-2">
+                        Upload the actual {fileType.toUpperCase()} file here.
+                      </p>
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors bg-blue-50">
+                        {sourceFile ? (
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-center text-blue-600">
+                              <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 011.414.586l4 4a1 1 0 01.586 1.414V19a2 2 0 01-2 2z" />
+                              </svg>
+                            </div>
+                            <p className="text-sm text-gray-900 font-medium">{sourceFile.name}</p>
+                            <p className="text-xs text-gray-500">{(sourceFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                            <button
+                              type="button"
+                              onClick={() => setSourceFile(null)}
+                              className="text-red-600 text-sm hover:text-red-700 font-medium"
+                              disabled={loading}
+                            >
+                              Remove Source File
+                            </button>
+                          </div>
+                        ) : (
+                          <label className="cursor-pointer block">
+                            <svg className="w-12 h-12 text-blue-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                            </svg>
+                            <p className="text-blue-600 mb-2">Upload {fileType.toUpperCase()} File</p>
+                            <p className="text-sm text-blue-400">Required for download</p>
+                            <input
+                              type="file"
+                              className="hidden"
+                              onChange={(e) => e.target.files && setSourceFile(e.target.files[0])}
+                              disabled={loading}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {error && <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">{error}</div>}
                   {success && <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-600">{success}</div>}
