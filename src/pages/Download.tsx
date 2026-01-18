@@ -3,7 +3,6 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { fetchImageBySlug, getDownloadUrl, getDriveThumbnailUrl } from '../lib/api'
 import Countdown from '../components/Countdown'
-import MonetagNativeBanner from '../components/ads/MonetagNativeBanner'
 import type { ImageItem } from '../types'
 
 const siteName = import.meta.env.VITE_SITE_NAME || 'Image Download Hub'
@@ -147,10 +146,7 @@ function Download() {
           </ol>
         </nav>
 
-        {/* Ad - Native Banner Top */}
-        <div className="mb-6">
-          <MonetagNativeBanner />
-        </div>
+
 
         {/* Main Download Card */}
         <div className="max-w-2xl mx-auto">
@@ -247,10 +243,7 @@ function Download() {
           </div>
         </div>
 
-        {/* Ad - Native Banner Bottom */}
-        <div className="mt-6">
-          <MonetagNativeBanner />
-        </div>
+
 
         {/* Social Bar / Multitag handled globally via index.html */}
       </div>
