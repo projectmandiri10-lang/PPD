@@ -10,9 +10,10 @@ type UserRole = 'admin' | 'operator' | null
 
 interface Operator {
   id: string
-  username: string
-  password: string
-  createdAt: string
+  user_id: string
+  email: string
+  role: string
+  created_at: string
 }
 
 function Admin() {
@@ -1038,17 +1039,17 @@ function Admin() {
                     {operators.map((op) => (
                       <div key={op.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                         <div>
-                          <p className="font-medium text-gray-900">{op.username}</p>
+                          <p className="font-medium text-gray-900">{op.email}</p>
                           <p className="text-xs text-gray-500 mb-1">
-                            Created: {new Date(op.createdAt).toLocaleDateString('id-ID')}
+                            Created: {new Date(op.created_at).toLocaleDateString('id-ID')}
                           </p>
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-semibold bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
-                              {getOperatorStats(op.username)} uploads
+                              {getOperatorStats(op.email)} uploads
                             </span>
                             <button
                               onClick={() => {
-                                setFilterUploader(op.username);
+                                setFilterUploader(op.email);
                                 setActiveTab('list');
                               }}
                               className="text-xs text-blue-600 hover:text-blue-800 underline"
@@ -1058,7 +1059,7 @@ function Admin() {
                           </div>
                         </div>
                         <button
-                          onClick={() => handleDeleteOperator(op.id, op.username)}
+                          onClick={() => handleDeleteOperator(op.user_id, op.email)}
                           className="text-red-600 hover:text-red-700 p-2"
                           title="Delete operator"
                         >

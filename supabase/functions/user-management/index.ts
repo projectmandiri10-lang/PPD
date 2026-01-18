@@ -1,3 +1,5 @@
+// @ts-ignore: Deno types
+declare const Deno: any;
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
@@ -37,19 +39,33 @@ serve(async (req: Request) => {
         }
 
         const { action, data } = body
+        console.log('[DEBUG] Action:', action)
 
         // 1. Verify Request
         const authHeader = req.headers.get('Authorization')
+        console.log('[DEBUG] Auth header present:', !!authHeader)
+
         if (!authHeader) {
+            console.error('[ERROR] Missing Authorization header')
             throw new Error('Missing Authorization header')
         }
 
         const token = authHeader.replace('Bearer ', '')
+        console.log('[DEBUG] Token length:', token.length)
+
         const { data: { user }, error: userError } = await supabase.auth.getUser(token)
 
-        if (userError || !user) {
-            throw new Error('Invalid token')
+        if (userError) {
+            console.error('[ERROR] Auth error:', userError.message)
+            throw new Error('Invalid token: ' + userError.message)
         }
+
+        if (!user) {
+            console.error('[ERROR] No user returned from auth')
+            throw new Error('Invalid token: No user')
+        }
+
+        console.log('[DEBUG] User authenticated:', user.id, user.email)
 
         // 2. Verify Role
         const { data: roleData, error: roleError } = await supabase
@@ -58,18 +74,25 @@ serve(async (req: Request) => {
             .eq('user_id', user.id)
             .single()
 
+        console.log('[DEBUG] Role data:', roleData, 'Error:', roleError)
+
         // If user not in user_roles, treat as unauthorized for admin actions
         if (!roleData || roleData.role !== 'admin') {
-            // Exception: Allow getting own info? No, keep it strict.
-            // But wait, if roleData is null, we can't check role.
-            // If user is valid auth user but not in user_roles, we assume no access.
+            console.warn('[WARN] User not admin. Role:', roleData?.role, 'User:', user.email)
             return new Response(JSON.stringify({
-                error: 'Unauthorized: Admin access required'
+                error: 'Unauthorized: Admin access required',
+                debug: {
+                    user_id: user.id,
+                    email: user.email,
+                    role_found: roleData?.role || null
+                }
             }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 status: 403,
             })
         }
+
+        console.log('[DEBUG] Admin verified, proceeding with action:', action)
 
         // 3. Handle Actions
         if (action === 'create_operator') {
