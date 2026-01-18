@@ -4,10 +4,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Headers': '*', // Allow all headers
+    'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, DELETE, PUT',
 }
 
 serve(async (req: Request) => {
+    // Handle CORS preflight
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders })
     }
@@ -17,7 +19,6 @@ serve(async (req: Request) => {
         const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
         if (!supabaseKey) {
-            console.error('Missing SUPABASE_SERVICE_ROLE_KEY')
             throw new Error('Server misconfiguration: Missing Service Key')
         }
 
@@ -28,14 +29,18 @@ serve(async (req: Request) => {
             }
         })
 
-        const body = await req.json()
+        let body;
+        try {
+            body = await req.json()
+        } catch (e) {
+            throw new Error('Invalid JSON body')
+        }
+
         const { action, data } = body
-        console.log(`Action: ${action}`)
 
         // 1. Verify Request
         const authHeader = req.headers.get('Authorization')
         if (!authHeader) {
-            console.error('Missing Auth Header')
             throw new Error('Missing Authorization header')
         }
 
@@ -43,11 +48,8 @@ serve(async (req: Request) => {
         const { data: { user }, error: userError } = await supabase.auth.getUser(token)
 
         if (userError || !user) {
-            console.error('Invalid token:', userError)
             throw new Error('Invalid token')
         }
-
-        console.log(`User ID: ${user.id}`)
 
         // 2. Verify Role
         const { data: roleData, error: roleError } = await supabase
@@ -56,50 +58,34 @@ serve(async (req: Request) => {
             .eq('user_id', user.id)
             .single()
 
-        if (roleError) {
-            console.error('Role check failed:', roleError)
-        }
-
-        console.log(`User Role: ${roleData?.role}`)
-
-        if (roleData?.role !== 'admin') {
-            // DEBUG MODE: Return detail instead of throwing 401 directly
-            // This helps us see what the server sees.
+        // If user not in user_roles, treat as unauthorized for admin actions
+        if (!roleData || roleData.role !== 'admin') {
+            // Exception: Allow getting own info? No, keep it strict.
+            // But wait, if roleData is null, we can't check role.
+            // If user is valid auth user but not in user_roles, we assume no access.
             return new Response(JSON.stringify({
-                error: 'Unauthorized: Admin access required',
-                debug: {
-                    user_id: user.id,
-                    email: user.email,
-                    role_found: roleData?.role || 'null',
-                    role_error: roleError ? roleError.message : 'none'
-                }
+                error: 'Unauthorized: Admin access required'
             }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 403, // Using 403 Forbidden instead of 401 to differentiate
+                status: 403,
             })
         }
 
         // 3. Handle Actions
-
-        // ACTION: create_operator
-        // Creates a new user in Supabase Auth and adds to user_roles table
         if (action === 'create_operator') {
             const { email, password } = data
-
             if (!email || !password) throw new Error('Email and password required')
 
-            // Create user in Auth
             const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
                 email,
                 password,
-                email_confirm: true, // Auto confirm
+                email_confirm: true,
                 user_metadata: { role: 'operator' }
             })
 
             if (createError) throw createError
 
-            // Add to user_roles table
-            const { error: roleError } = await supabase
+            const { error: roleInsertError } = await supabase
                 .from('user_roles')
                 .insert({
                     user_id: newUser.user.id,
@@ -107,10 +93,9 @@ serve(async (req: Request) => {
                     role: 'operator'
                 })
 
-            if (roleError) {
-                // If role creation fails, try to cleanup the user (optional but good practice)
-                await supabase.auth.admin.deleteUser(newUser.user.id)
-                throw new Error('Failed to assign role: ' + roleError.message)
+            if (roleInsertError) {
+                await supabase.auth.admin.deleteUser(newUser.user.id) // Rollback
+                throw new Error('Failed to assign role: ' + roleInsertError.message)
             }
 
             return new Response(JSON.stringify({
@@ -122,8 +107,6 @@ serve(async (req: Request) => {
             })
         }
 
-        // ACTION: list_operators
-        // Lists all users with role 'operator' from user_roles table
         if (action === 'list_operators') {
             const { data: operators, error } = await supabase
                 .from('user_roles')
