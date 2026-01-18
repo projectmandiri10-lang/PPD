@@ -37,7 +37,7 @@ function Admin() {
   const [sourceFile, setSourceFile] = useState<File | null>(null)
   const [fileType, setFileType] = useState<string>('jpg')
   const [description, setDescription] = useState('')
-  // const [generatingDesc, setGeneratingDesc] = useState(false) // Disabled AI generation
+  const [generatingDesc, setGeneratingDesc] = useState(false)
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false)
 
   // UI state
@@ -187,20 +187,19 @@ function Admin() {
     }
   }, [])
 
-  // Auto-generate description with Gemini AI when image is selected
-  // DISABLED: API Key issue - users can input description manually
-  /*
+  // Auto-generate description with Hugging Face AI when image is selected
   useEffect(() => {
     const generateDesc = async () => {
       if (!imageFile) return
 
       setGeneratingDesc(true)
       try {
-        const { generateImageDescription } = await import('../lib/gemini')
+        const { generateImageDescription } = await import('../lib/huggingface')
         const result = await generateImageDescription(imageFile)
         setDescription(result)
       } catch (err) {
         console.error('AI Generation failed:', err)
+        // Silently fail - user can input manually
       } finally {
         setGeneratingDesc(false)
       }
@@ -208,7 +207,6 @@ function Admin() {
 
     generateDesc()
   }, [imageFile])
-  */
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
@@ -928,18 +926,27 @@ function Admin() {
                     </div>
                   )}
 
+
                   <div className="mb-6">
                     <label className="label flex justify-between items-center">
                       <span>Description (SEO & Pinterest) - Optional</span>
+                      {generatingDesc && (
+                        <span className="text-xs text-purple-600 flex items-center animate-pulse">
+                          <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          </svg>
+                          Generating with AI...
+                        </span>
+                      )}
                     </label>
                     <textarea
                       className="input h-32 text-sm"
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Enter description for Pinterest and SEO..."
-                      disabled={loading}
+                      placeholder="AI will auto-generate description when you select an image..."
+                      disabled={loading || generatingDesc}
                     ></textarea>
-                    <p className="text-xs text-gray-500 mt-1">This text will be used for Pinterest description and SEO.</p>
+                    <p className="text-xs text-gray-500 mt-1">Powered by Hugging Face AI. Description will be used for Pinterest and SEO.</p>
                   </div>
 
                   {error && <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">{error}</div>}
