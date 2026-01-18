@@ -33,6 +33,7 @@ Thumbs.db
 APP_STRATEGY.md
 MONETAG_GUIDE.md
 ADSTERRA_GUIDE.md
+HILLTOPADS_GUIDE.md
 
 # Google Apps Script (contains sensitive IDs)
 scripts/google-apps-script.js
