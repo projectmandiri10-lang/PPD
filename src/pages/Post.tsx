@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { fetchImageBySlug, getDriveThumbnailUrl } from '../lib/api'
+import { getLocale, translations } from '../lib/i18n'
 import type { ImageItem } from '../types'
 
 const siteName = import.meta.env.VITE_SITE_NAME || 'Image Download Hub'
@@ -14,6 +15,11 @@ function Post() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [imageLoaded, setImageLoaded] = useState(false)
+
+  const locale = getLocale()
+  const t = translations[locale]
+
+  // ... (useEffects loadItem)
 
   useEffect(() => {
     async function loadItem() {
@@ -28,7 +34,7 @@ function Post() {
       const result = await fetchImageBySlug(slug)
 
       if (result.error || !result.data) {
-        setError(result.error || 'Image not found')
+        setError(result.error || t.notFound)
       } else {
         setItem(result.data)
       }
@@ -37,7 +43,7 @@ function Post() {
     }
 
     loadItem()
-  }, [slug, navigate])
+  }, [slug, navigate, t])
 
   // Get image URL - Always use helper to ensure mobile compatibility
   const getImageUrl = (item: ImageItem) => {
@@ -49,7 +55,7 @@ function Post() {
       <div className="container-main py-20">
         <div className="flex flex-col items-center justify-center">
           <div className="spinner mb-4"></div>
-          <p className="text-gray-500">Loading...</p>
+          <p className="text-gray-500">{t.loading}</p>
         </div>
       </div>
     )
@@ -72,12 +78,12 @@ function Post() {
               d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
             />
           </svg>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Image Not Found</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">{t.notFound}</h1>
           <p className="text-gray-500 mb-6">
             {error || 'The image you are looking for does not exist.'}
           </p>
           <Link to="/" className="btn-primary">
-            Back to Home
+            {t.backToHome}
           </Link>
         </div>
       </div>
@@ -86,17 +92,18 @@ function Post() {
 
   const pageUrl = `${siteUrl}/#/p/${item.slug}`
   const downloadPageUrl = `${siteUrl}/#/d/${item.slug}`
+  const metaDescription = item.description || `Download ${item.title} - High quality image from ${siteName}. Free HD download.`
 
   return (
     <>
       <Helmet>
         <title>{item.title} - {siteName}</title>
-        <meta name="description" content={`Download ${item.title} - High quality image from ${siteName}. Free HD download.`} />
+        <meta name="description" content={metaDescription} />
         <meta name="keywords" content={`${item.title}, download, free image, HD, wallpaper, ${siteName}`} />
 
         {/* Open Graph */}
         <meta property="og:title" content={`${item.title} - ${siteName}`} />
-        <meta property="og:description" content={`Download ${item.title} - High quality image. Free HD download.`} />
+        <meta property="og:description" content={metaDescription} />
         <meta property="og:image" content={getImageUrl(item)} />
         <meta property="og:image:alt" content={item.title} />
         <meta property="og:type" content="article" />
@@ -106,7 +113,7 @@ function Post() {
         {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={`${item.title} - ${siteName}`} />
-        <meta name="twitter:description" content={`Download ${item.title} - High quality image`} />
+        <meta name="twitter:description" content={metaDescription} />
         <meta name="twitter:image" content={getImageUrl(item)} />
         <meta name="twitter:image:alt" content={item.title} />
 
@@ -120,7 +127,7 @@ function Post() {
             "@context": "https://schema.org",
             "@type": "ImageObject",
             "name": item.title,
-            "description": `Download ${item.title} - High quality image from ${siteName}`,
+            "description": metaDescription,
             "contentUrl": getImageUrl(item),
             "thumbnailUrl": getImageUrl(item),
             "uploadDate": item.createdAt,
@@ -144,7 +151,7 @@ function Post() {
               {
                 "@type": "ListItem",
                 "position": 1,
-                "name": "Home",
+                "name": t.home,
                 "item": siteUrl || window.location.origin
               },
               {
@@ -163,7 +170,7 @@ function Post() {
         <nav className="mb-6">
           <ol className="flex items-center text-sm text-gray-500">
             <li>
-              <Link to="/" className="hover:text-primary-600 transition-colors">Home</Link>
+              <Link to="/" className="hover:text-primary-600 transition-colors">{t.home}</Link>
             </li>
             <li className="mx-2">/</li>
             <li className="text-gray-900 font-medium truncate max-w-xs">{item.title}</li>
@@ -181,6 +188,7 @@ function Post() {
                 <img
                   src={getImageUrl(item)}
                   alt={item.title}
+                  data-pin-description={item.description || item.title}
                   className={`w-full h-auto max-h-[70vh] object-contain transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'
                     }`}
                   onLoad={() => setImageLoaded(true)}
@@ -197,23 +205,29 @@ function Post() {
               {item.fileType && item.fileType !== 'jpg' && (
                 <div className="mb-2">
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${item.fileType === 'pdf' ? 'bg-red-100 text-red-800' :
-                      item.fileType === 'vector' ? 'bg-orange-100 text-orange-800' :
-                        item.fileType === 'zip' ? 'bg-gray-100 text-gray-800' :
-                          'bg-blue-100 text-blue-800'
+                    item.fileType === 'vector' ? 'bg-orange-100 text-orange-800' :
+                      item.fileType === 'zip' ? 'bg-gray-100 text-gray-800' :
+                        'bg-blue-100 text-blue-800'
                     }`}>
                     {item.fileType.toUpperCase()}
                   </span>
                 </div>
               )}
 
-              <h1 className="text-2xl font-bold text-gray-900 mb-4">
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">
                 {item.title}
               </h1>
+
+              {item.description && (
+                <div className="text-gray-600 mb-6 text-sm leading-relaxed whitespace-pre-line">
+                  {item.description}
+                </div>
+              )}
 
               <div className="text-sm text-gray-500 mb-6 space-y-1">
                 {item.createdAt && (
                   <p>
-                    Added: {new Date(item.createdAt).toLocaleDateString('id-ID', {
+                    Added: {new Date(item.createdAt).toLocaleDateString(locale === 'id' ? 'id-ID' : 'en-US', {
                       year: 'numeric',
                       month: 'long',
                       day: 'numeric'
@@ -221,7 +235,7 @@ function Post() {
                   </p>
                 )}
                 {item.fileType && item.fileType !== 'jpg' && (
-                  <p>Format: <strong>{item.fileType.toUpperCase()}</strong></p>
+                  <p>{t.format}: <strong>{item.fileType.toUpperCase()}</strong></p>
                 )}
               </div>
 
@@ -243,7 +257,7 @@ function Post() {
                     d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
                   />
                 </svg>
-                Download
+                {t.download}
               </Link>
 
               {/* Share Section */}

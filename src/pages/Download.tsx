@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { fetchImageBySlug, getDownloadUrl, getDriveThumbnailUrl } from '../lib/api'
+import { getLocale, translations } from '../lib/i18n'
 import Countdown from '../components/Countdown'
 import type { ImageItem } from '../types'
 
@@ -18,6 +19,9 @@ function Download() {
   const [countdownComplete, setCountdownComplete] = useState(false)
   const [redirectFailed, setRedirectFailed] = useState(false)
   const [downloadUrl, setDownloadUrl] = useState('')
+
+  const locale = getLocale()
+  const t = translations[locale]
 
   useEffect(() => {
     async function loadItem() {
@@ -42,7 +46,7 @@ function Download() {
     }
 
     loadItem()
-  }, [slug, navigate])
+  }, [slug, navigate, t])
 
   const handleCountdownComplete = useCallback(() => {
     setCountdownComplete(true)
@@ -77,7 +81,7 @@ function Download() {
       <div className="container-main py-20">
         <div className="flex flex-col items-center justify-center">
           <div className="spinner mb-4"></div>
-          <p className="text-gray-500">Loading...</p>
+          <p className="text-gray-500">{t.loading}</p>
         </div>
       </div>
     )
@@ -100,12 +104,12 @@ function Download() {
               d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
             />
           </svg>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Download Not Found</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">{t.notFound}</h1>
           <p className="text-gray-500 mb-6">
             {error || 'The download you are looking for does not exist.'}
           </p>
           <Link to="/" className="btn-primary">
-            Back to Home
+            {t.backToHome}
           </Link>
         </div>
       </div>
@@ -133,7 +137,7 @@ function Download() {
         <nav className="mb-6">
           <ol className="flex items-center text-sm text-gray-500 flex-wrap">
             <li>
-              <Link to="/" className="hover:text-primary-600 transition-colors">Home</Link>
+              <Link to="/" className="hover:text-primary-600 transition-colors">{t.home}</Link>
             </li>
             <li className="mx-2">/</li>
             <li>
@@ -169,11 +173,11 @@ function Download() {
             {item.fileType && item.fileType !== 'jpg' && (
               <div className="flex justify-center mb-6">
                 <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${item.fileType === 'pdf' ? 'bg-red-100 text-red-800' :
-                    item.fileType === 'vector' ? 'bg-orange-100 text-orange-800' :
-                      item.fileType === 'zip' ? 'bg-gray-100 text-gray-800' :
-                        'bg-blue-100 text-blue-800'
+                  item.fileType === 'vector' ? 'bg-orange-100 text-orange-800' :
+                    item.fileType === 'zip' ? 'bg-gray-100 text-gray-800' :
+                      'bg-blue-100 text-blue-800'
                   }`}>
-                  Format: {item.fileType.toUpperCase()}
+                  {t.format}: {item.fileType.toUpperCase()}
                 </span>
               </div>
             )}
@@ -210,7 +214,7 @@ function Download() {
                           d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
                         />
                       </svg>
-                      Continue Download
+                      {t.download}
                     </button>
                   ) : (
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
@@ -250,7 +254,7 @@ function Download() {
                 to={`/p/${item.slug}`}
                 className="text-primary-600 hover:text-primary-700 font-medium transition-colors"
               >
-                &larr; Back to Image Details
+                &larr; {t.details}
               </Link>
             </div>
           </div>

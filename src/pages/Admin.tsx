@@ -4,7 +4,6 @@ import { generateSlug, uploadImage, createImageEntry, clearCache, fetchImageList
 import type { ImageItem } from '../types'
 
 const ADMIN_TOKEN_KEY = 'admin_auth_token'
-const OPERATORS_STORAGE_KEY = 'app_operators'
 
 type TabType = 'list' | 'upload' | 'operators'
 type UserRole = 'admin' | 'operator' | null
@@ -23,7 +22,6 @@ function Admin() {
   // Login state
   const [loginType, setLoginType] = useState<'admin' | 'operator'>('admin')
   const [email, setEmail] = useState('')
-  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [authError, setAuthError] = useState('')
 
@@ -37,6 +35,8 @@ function Admin() {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [sourceFile, setSourceFile] = useState<File | null>(null)
   const [fileType, setFileType] = useState<string>('jpg')
+  const [description, setDescription] = useState('')
+  const [generatingDesc, setGeneratingDesc] = useState(false)
 
   // UI state
   const [loading, setLoading] = useState(false)
@@ -44,42 +44,70 @@ function Admin() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
-  // Image list state
+  // Data state
   const [images, setImages] = useState<ImageItem[]>([])
+  const [operators, setOperators] = useState<Operator[]>([])
   const [listLoading, setListLoading] = useState(false)
   const [listError, setListError] = useState<string | null>(null)
 
-  // Edit modal state
+  // Filter state
+  const [filterUploader, setFilterUploader] = useState<string | null>(null)
+
+  // Edit Modal State
   const [editingImage, setEditingImage] = useState<ImageItem | null>(null)
   const [editTitle, setEditTitle] = useState('')
   const [editSlug, setEditSlug] = useState('')
   const [editDownloadUrl, setEditDownloadUrl] = useState('')
 
-  // Operator management state
-  const [operators, setOperators] = useState<Operator[]>([])
+  // Operator Management State
   const [newOperatorEmail, setNewOperatorEmail] = useState('')
   const [newOperatorPassword, setNewOperatorPassword] = useState('')
   const [operatorError, setOperatorError] = useState<string | null>(null)
   const [operatorSuccess, setOperatorSuccess] = useState<string | null>(null)
 
-  // Statistics Filter
-  const [filterUploader, setFilterUploader] = useState<string | null>(null)
-
-  const getOperatorStats = useCallback((email: string) => {
-    return images.filter(img => img.uploadedBy === email).length
-  }, [images])
-
-  const filteredImages = useMemo(() => {
-    if (!filterUploader) return images
-    return images.filter(img => img.uploadedBy === filterUploader)
-  }, [images, filterUploader])
-
-  // Load operators from Supabase
-  const loadOperators = async () => {
-    try {
+  // Auth Check
+  useEffect(() => {
+    const checkAuth = async () => {
       const { supabase } = await import('../lib/supabase')
       const { data: { session } } = await supabase.auth.getSession()
 
+      if (session?.user) {
+        setUserRole(session.user.user_metadata?.role || 'admin') // Default to admin for MVP if role missing
+        setCurrentUser(session.user.email || '')
+      } else {
+        // Check local token fallback (legacy)
+        const token = localStorage.getItem(ADMIN_TOKEN_KEY)
+        if (token) {
+          setUserRole('admin')
+        }
+      }
+    }
+    checkAuth()
+  }, [])
+
+  // Auto-generate slug
+  useEffect(() => {
+    if (title && !slug) {
+      setSlug(generateSlug(title))
+    }
+  }, [title]) // Removed slug dependency to allow manual diff
+
+  const loadImages = useCallback(async () => {
+    setListLoading(true)
+    setListError(null)
+    const result = await fetchImageList()
+    if (result.error) {
+      setListError(result.error)
+    } else if (result.data) {
+      setImages(result.data.reverse())
+    }
+    setListLoading(false)
+  }, [])
+
+  const loadOperators = useCallback(async () => {
+    try {
+      const { supabase } = await import('../lib/supabase')
+      const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
 
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/user-management`, {
@@ -90,207 +118,60 @@ function Admin() {
         },
         body: JSON.stringify({ action: 'list_operators' })
       })
-
-      const result = await response.json()
-
-      if (response.ok && result.data) {
-        // Map Supabase users to Operator interface
-        const ops: Operator[] = result.data.map((u: any) => ({
-          id: u.user_id, // Use user_id (Auth UUID) instead of row id
-          username: u.email,
-          password: '***', // Password not available
-          createdAt: u.created_at
-        }))
-        setOperators(ops)
-      }
-    } catch (err) {
-      console.error('Failed to load operators', err)
+      const res = await response.json()
+      if (res.data) setOperators(res.data)
+    } catch (e) {
+      console.error("Error loading operators", e)
     }
-  }
-
-  // Check existing auth on mount
-  useEffect(() => {
-    loadOperators()
-
-    // Check Supabase session for admin
-    const checkAuth = async () => {
-      const { supabase, getUserRole } = await import('../lib/supabase')
-      const { data: { session } } = await supabase.auth.getSession()
-
-      if (session?.user) {
-        const { role } = await getUserRole()
-        if (role === 'admin') {
-          setUserRole('admin')
-          setCurrentUser(session.user.email || '')
-          return
-        }
-      }
-
-      // Check localStorage for operator
-      const token = localStorage.getItem(ADMIN_TOKEN_KEY)
-      if (token && token.startsWith('operator:')) {
-        const opUsername = token.replace('operator:', '')
-        const stored = localStorage.getItem(OPERATORS_STORAGE_KEY)
-        if (stored) {
-          const ops: Operator[] = JSON.parse(stored)
-          const op = ops.find(o => o.username === opUsername)
-          if (op) {
-            setUserRole('operator')
-            setCurrentUser(opUsername)
-            return
-          }
-        }
-      }
-
-      // No valid session
-      localStorage.removeItem(ADMIN_TOKEN_KEY)
-    }
-
-    checkAuth()
   }, [])
 
-  // Auto-generate slug from title
-  useEffect(() => {
-    if (title) {
-      setSlug(generateSlug(title))
-    }
-  }, [title])
-
-  // Load images when authenticated
   useEffect(() => {
     if (userRole) {
       loadImages()
+      if (userRole === 'admin') loadOperators()
     }
-  }, [userRole])
+  }, [userRole, loadImages, loadOperators])
 
-  const loadImages = async () => {
-    setListLoading(true)
-    setListError(null)
-
-    const result = await fetchImageList()
-
-    if (result.error) {
-      setListError(result.error)
-    } else if (result.data) {
-      setImages(result.data)
-    }
-
-    setListLoading(false)
-  }
-
-  const handleLogin = useCallback(async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setAuthError('')
-    setLoading(true)
 
     try {
-      if (loginType === 'admin') {
-        // Admin login with Supabase Auth
-        const { supabase, getUserRole } = await import('../lib/supabase')
+      const { supabase } = await import('../lib/supabase')
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      })
 
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password: password
-        })
+      if (error) throw error
 
-        if (error) {
-          console.error(error)
-          setAuthError(error.message)
-          setLoading(false)
-          return
-        }
-
-        if (!data.user) {
-          setAuthError('Login failed')
-          setLoading(false)
-          return
-        }
-
-        // Get user role from database
-        const { role, error: roleError } = await getUserRole()
-
-        if (roleError || !role) {
-          setAuthError('User not authorized. Please contact administrator.')
-          await supabase.auth.signOut()
-          setLoading(false)
-          return
-        }
-
-        if (role !== 'admin') {
-          setAuthError('Access denied. Admin privileges required.')
-          await supabase.auth.signOut()
-          setLoading(false)
-          return
-        }
-
-        // Success - set admin role
-        setUserRole('admin')
-        setCurrentUser(data.user.email || '')
-        setLoading(false)
-      } else {
-        // Operator login with Supabase Auth
-        const { supabase, getUserRole } = await import('../lib/supabase')
-
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password: password
-        })
-
-        if (error) {
-          console.error(error)
-          setAuthError(error.message)
-          setLoading(false)
-          return
-        }
-
-        if (!data.user) {
-          setAuthError('Login failed')
-          setLoading(false)
-          return
-        }
-
-        // Get user role from database
-        const { role, error: roleError } = await getUserRole()
-
-        if (roleError || !role) {
-          setAuthError('User not authorized. Please contact administrator.')
-          await supabase.auth.signOut()
-          setLoading(false)
-          return
-        }
-
-        if (role !== 'operator' && role !== 'admin') {
-          setAuthError('Invalid user role.')
-          await supabase.auth.signOut()
-          setLoading(false)
-          return
-        }
-
-        // Success - set operator role
+      if (data.session) {
+        const role = data.session.user.user_metadata?.role || (loginType === 'admin' ? 'admin' : 'operator')
         setUserRole(role)
-        setCurrentUser(data.user.email || '')
-        setLoading(false)
+        setCurrentUser(email)
+        if (role === 'admin') localStorage.setItem(ADMIN_TOKEN_KEY, data.session.access_token)
       }
     } catch (err) {
-      setAuthError(err instanceof Error ? err.message : 'Login failed')
-      setLoading(false)
+      setAuthError(err instanceof Error ? err.message : 'Invalid credentials')
     }
-  }, [loginType, email, password, username])
+  }
 
-  const handleLogout = useCallback(async () => {
-    if (userRole === 'admin') {
-      const { supabase } = await import('../lib/supabase')
-      await supabase.auth.signOut()
-    } else {
-      localStorage.removeItem(ADMIN_TOKEN_KEY)
-    }
+  const handleLogout = async () => {
+    const { supabase } = await import('../lib/supabase')
+    await supabase.auth.signOut()
     setUserRole(null)
     setCurrentUser('')
-    setEmail('')
-    setUsername('')
-    setPassword('')
-    setActiveTab('list')
-  }, [userRole])
+    localStorage.removeItem(ADMIN_TOKEN_KEY)
+  }
+
+  const getOperatorStats = (username: string) => {
+    return images.filter(img => img.uploadedBy === username).length
+  }
+
+  const filteredImages = useMemo(() => {
+    if (!filterUploader) return images
+    return images.filter(img => img.uploadedBy === filterUploader)
+  }, [images, filterUploader])
 
   const handleImageChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -303,6 +184,26 @@ function Admin() {
       reader.readAsDataURL(file)
     }
   }, [])
+
+  // Auto-generate description with Gemini AI when image is selected
+  useEffect(() => {
+    const generateDesc = async () => {
+      if (!imageFile) return
+
+      setGeneratingDesc(true)
+      try {
+        const { generateImageDescription } = await import('../lib/gemini')
+        const result = await generateImageDescription(imageFile)
+        setDescription(result)
+      } catch (err) {
+        console.error('AI Generation failed:', err)
+      } finally {
+        setGeneratingDesc(false)
+      }
+    }
+
+    generateDesc()
+  }, [imageFile])
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
@@ -356,7 +257,8 @@ function Admin() {
         downloadUrl: finalDownloadUrl,
         uploadedBy: currentUser,
         sourceFileId: sourceFileId,
-        fileType: fileType
+        fileType: fileType,
+        description: description
       })
 
       if (createResult.error) throw new Error(createResult.error)
@@ -368,6 +270,7 @@ function Admin() {
       setImagePreview(null)
       setSourceFile(null)
       setFileType('jpg')
+      setDescription('')
       setSuccess('Content uploaded successfully!')
 
       clearCache()
@@ -1016,6 +919,28 @@ function Admin() {
                       </div>
                     </div>
                   )}
+
+                  <div className="mb-6">
+                    <label className="label flex justify-between items-center">
+                      <span>Description (SEO & Pinterest) - Optional</span>
+                      {generatingDesc && (
+                        <span className="text-xs text-purple-600 flex items-center animate-pulse">
+                          <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          </svg>
+                          Generating with AI...
+                        </span>
+                      )}
+                    </label>
+                    <textarea
+                      className="input h-32 text-sm"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Enter description manually or generate with AI..."
+                      disabled={loading || generatingDesc}
+                    ></textarea>
+                    <p className="text-xs text-gray-500 mt-1">This text will be used for Pinterest description and SEO.</p>
+                  </div>
 
                   {error && <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">{error}</div>}
                   {success && <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-600">{success}</div>}

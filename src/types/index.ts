@@ -8,6 +8,7 @@ export interface ImageItem {
   uploadedBy?: string; // Email of uploader
   sourceFileId?: string; // ID of the actual file (PDF/Vector) separate from preview
   fileType?: string; // 'jpg', 'png', 'pdf', 'ai', 'eps', etc.
+  description?: string; // AI Generated
   createdAt: string;
 }
 
@@ -33,4 +34,5 @@ export interface AdminFormData {
   imageFile: File | null;
   sourceFile: File | null;
   fileType: string;
+  description: string;
 }
